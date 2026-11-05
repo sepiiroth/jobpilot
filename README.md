@@ -49,3 +49,7 @@ See [API setup and authentication](docs/api-authentication.md) for startup, acco
 ## Phase 3: web workspace
 
 See [web setup and verification](docs/web.md) for the French Next.js shell, login, session protection, themes and client bundle checks. Run pnpm --filter @jobpilot/web dev alongside the API.
+
+## Phase 4: container deployment
+
+Follow [the CapRover deployment guide](docs/deployment-caprover.md) to configure the five apps and release images. The local smoke stack verifies isolated production containers without touching the normal development database.

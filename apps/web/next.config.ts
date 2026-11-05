@@ -1,8 +1,11 @@
 import type { NextConfig } from 'next';
+import { fileURLToPath } from 'node:url';
 import createNextIntlPlugin from 'next-intl/plugin';
 import { apiOrigin } from './src/lib/environment.ts';
 import { contentSecurityPolicy } from './src/lib/security.ts';
 const config: NextConfig = {
+  output: 'standalone',
+  outputFileTracingRoot: fileURLToPath(new URL('../../', import.meta.url)),
   images: { unoptimized: true },
   poweredByHeader: false,
   transpilePackages: ['@jobpilot/shared'],

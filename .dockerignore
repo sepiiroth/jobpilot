@@ -1,0 +1,26 @@
+.git
+**/node_modules
+**/.next
+**/.turbo
+**/coverage
+**/dist
+**/.env
+**/.env.*
+!.env.example
+**/*.log
+**/*.tsbuildinfo
+**/src/generated
+.github
+.husky
+.agents
+.codex
+.aws
+
+
+# Documentation and deployment definitions are not runtime source.
+**/Dockerfile
+**/captain-definition
+docs
+README.md
+CHANGELOG.md
+JobPilot*.md

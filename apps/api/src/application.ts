@@ -51,7 +51,7 @@ export async function createApplication(
       maxRetriesPerRequest: 1,
       connectTimeout: 3000,
       commandTimeout: 3000,
-      retryStrategy: () => null,
+      retryStrategy: (attempt) => Math.min(attempt * 200, 3000),
     });
   redis.on('error', () => {});
   const passwords = new Passwords();

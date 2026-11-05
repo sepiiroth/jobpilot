@@ -28,5 +28,10 @@
     "pg": "8.23.1",
     "@jobpilot/shared": "workspace:*",
     "zod": "4.6.7"
-  }
+  },
+  "files": [
+    "src",
+    "prisma",
+    "prisma.config.ts"
+  ]
 }

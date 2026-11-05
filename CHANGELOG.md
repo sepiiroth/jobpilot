@@ -19,3 +19,9 @@
 - Apply the approved Sonner type annotation fix for strict optional properties.
 
 - Verify production web startup on Node.js 24.22.1 and login accessibility at 100/100.
+
+- Add phase 4 multi-stage Docker images, standalone web output, API startup migrations and idle worker readiness.
+- Add a pinned, tag-triggered release workflow with critical vulnerability scanning before publication.
+- Document CapRover setup, registry access, environment variables, account creation and rollback.
+
+- Recover API and worker Valkey connections after transient startup or service interruptions.

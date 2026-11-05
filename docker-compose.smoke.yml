@@ -1,0 +1,56 @@
+services:
+  database:
+    image: pgvector/pgvector:0.8.2-pg18
+    environment:
+      POSTGRES_USER: jobpilot
+      POSTGRES_DB: jobpilot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U jobpilot -d jobpilot']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  valkey:
+    image: valkey/valkey:8-alpine
+    environment:
+      VALKEY_PASSWORD: ${VALKEY_PASSWORD:?Set VALKEY_PASSWORD in .env}
+    command:
+      ['sh', '-c', 'exec valkey-server --requirepass "$$VALKEY_PASSWORD"']
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'valkey-cli --no-auth-warning -a "$$VALKEY_PASSWORD" ping | grep PONG',
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  api:
+    image: jobpilot-api:phase4
+    depends_on:
+      database:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://jobpilot:${POSTGRES_PASSWORD}@database:5432/jobpilot
+      VALKEY_URL: redis://:${VALKEY_PASSWORD}@valkey:6379
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in .env}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env}
+      WEB_ORIGIN: https://web.example.invalid
+      LOG_LEVEL: warn
+  worker:
+    image: jobpilot-worker:phase4
+    depends_on:
+      database:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://jobpilot:${POSTGRES_PASSWORD}@database:5432/jobpilot
+      VALKEY_URL: redis://:${VALKEY_PASSWORD}@valkey:6379
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in .env}
+  web:
+    image: jobpilot-web:phase4

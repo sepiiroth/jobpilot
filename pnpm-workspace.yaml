@@ -2,3 +2,9 @@ packages:
   - apps/*
   - packages/*
 onlyBuiltDependencies: []
+
+# Keep production deploy output reproducible from the workspace lockfile.
+injectWorkspacePackages: true
+syncInjectedDepsAfterScripts:
+  - generate
+  - typecheck
