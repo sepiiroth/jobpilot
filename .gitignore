@@ -12,3 +12,6 @@ coverage/
 Thumbs.db
 
 packages/db/src/generated/
+
+*.tsbuildinfo
+apps/web/next-env.d.ts

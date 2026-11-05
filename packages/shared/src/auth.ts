@@ -15,3 +15,16 @@ export const deleteAccountSchema = z.strictObject({
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
+export const currentUserSchema = z.object({
+  id: z.uuid(),
+  email: z.email(),
+  locale: z.string(),
+  createdAt: z.iso.datetime(),
+});
+export const csrfResponseSchema = z.object({ csrfToken: z.string().min(1) });
+export const loginResponseSchema = z.object({
+  user: currentUserSchema.omit({ createdAt: true }),
+  csrfToken: z.string().min(1),
+});
+export type CurrentUser = z.infer<typeof currentUserSchema>;

@@ -45,3 +45,7 @@ Shared schemas are exported from @jobpilot/shared. Node-only SHA-256 deduplicati
 ## Phase 2: secure API
 
 See [API setup and authentication](docs/api-authentication.md) for startup, account commands, CSRF, sessions, export and key rotation. Start with pnpm --filter @jobpilot/api start after configuring .env.
+
+## Phase 3: web workspace
+
+See [web setup and verification](docs/web.md) for the French Next.js shell, login, session protection, themes and client bundle checks. Run pnpm --filter @jobpilot/web dev alongside the API.

@@ -1,0 +1,80 @@
+{
+  "Common": {
+    "appDescription": "Votre recherche d’emploi, organisée à votre rythme.",
+    "retry": "Réessayer",
+    "loading": "Chargement…",
+    "skip": "Aller au contenu principal",
+    "soon": "Bientôt disponible",
+    "logout": "Se déconnecter",
+    "logoutError": "La déconnexion a échoué. Réessayez.",
+    "theme": "Changer le thème",
+    "light": "Clair",
+    "dark": "Sombre",
+    "system": "Système",
+    "workspace": "Espace personnel",
+    "menu": "Ouvrir le menu",
+    "navigation": "Navigation principale",
+    "closeMenu": "Fermer le menu"
+  },
+  "Nav": {
+    "dashboard": "Tableau de bord",
+    "offers": "Offres",
+    "resumes": "CV",
+    "searches": "Recherches",
+    "applications": "Candidatures",
+    "settings": "Paramètres"
+  },
+  "Login": {
+    "eyebrow": "UN NOUVEAU CHAPITRE",
+    "hero": "La suite de votre parcours se prépare ici.",
+    "intro": "Un espace à vous pour avancer dans votre recherche, une étape à la fois.",
+    "privacy": "Vos données, votre espace.",
+    "welcome": "Heureux de vous retrouver",
+    "description": "Connectez-vous à votre espace personnel.",
+    "email": "Adresse e-mail",
+    "emailPlaceholder": "vous@exemple.fr",
+    "password": "Mot de passe",
+    "showPassword": "Afficher le mot de passe",
+    "hidePassword": "Masquer le mot de passe",
+    "submit": "Se connecter",
+    "submitting": "Connexion en cours…",
+    "invalidEmail": "Saisissez une adresse e-mail valide.",
+    "requiredPassword": "Saisissez votre mot de passe.",
+    "credentials": "Adresse e-mail ou mot de passe incorrect.",
+    "rateLimit": "Trop de tentatives. Réessayez dans quelques minutes.",
+    "unavailable": "Connexion impossible pour le moment. Vérifiez que le service est disponible, puis réessayez.",
+    "accountNote": "Votre compte est créé par l’administrateur de votre instance.",
+    "secure": "Un espace privé, pour votre prochain départ."
+  },
+  "Session": {
+    "loading": "Ouverture de votre espace…",
+    "error": "Votre espace est momentanément indisponible.",
+    "description": "Nous n’avons pas pu vérifier votre connexion. Réessayez dans un instant."
+  },
+  "Dashboard": {
+    "eyebrow": "VOTRE ESPACE DE RECHERCHE",
+    "title": "Une nouvelle direction.",
+    "description": "Un peu de clarté pour votre prochain grand pas.",
+    "collect": "Lancer la collecte",
+    "collectNote": "La collecte sera bientôt disponible.",
+    "overview": "Votre recherche, en un coup d’œil",
+    "overviewDescription": "Tout commence par quelques repères.",
+    "resumeTitle": "Votre parcours",
+    "resumeDescription": "Rassemblez vos expériences et vos compétences dans un CV qui vous ressemble.",
+    "searchTitle": "Votre direction",
+    "searchDescription": "Précisez les postes et les environnements dans lesquels vous souhaitez évoluer.",
+    "offerTitle": "Vos opportunités",
+    "offerDescription": "Retrouvez ici les offres qui correspondent à vos envies.",
+    "activity": "Vos prochaines opportunités",
+    "emptyTitle": "Le champ des possibles est ouvert.",
+    "emptyDescription": "Vos offres prendront place ici. En attendant, prenez le temps de définir la suite de votre parcours.",
+    "emptyBadge": "Un espace prêt pour la suite",
+    "note": "À votre rythme",
+    "noteDescription": "Chaque recherche commence par un premier pas. Votre espace est là pour vous aider à garder le cap."
+  },
+  "Placeholder": {
+    "title": "Votre espace se prépare.",
+    "description": "Vous retrouverez bientôt ici les outils pour organiser cette partie de votre recherche.",
+    "back": "Revenir au tableau de bord"
+  }
+}

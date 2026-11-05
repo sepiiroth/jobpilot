@@ -11,3 +11,11 @@
 - Add account commands, export and deletion, AES-GCM key rotation, health checks and development OpenAPI.
 - Add HTTP security, credential-log redaction and ownership isolation tests with coverage enforcement.
 - Verify API startup and health against the pinned Node.js 24.22.1 runtime.
+
+- Add phase 3 Next.js workspace with French navigation, responsive layouts, themes and empty dashboard.
+- Add shared authentication responses and a typed API client with cookie sessions and CSRF renewal.
+- Add nonce-based CSP, browser bundle credential checks and login accessibility verification.
+
+- Apply the approved Sonner type annotation fix for strict optional properties.
+
+- Verify production web startup on Node.js 24.22.1 and login accessibility at 100/100.

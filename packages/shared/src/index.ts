@@ -176,3 +176,10 @@ export {
   type LoginInput,
   type ChangePasswordInput,
 } from './auth.ts';
+
+export {
+  currentUserSchema,
+  csrfResponseSchema,
+  loginResponseSchema,
+  type CurrentUser,
+} from './auth.ts';
