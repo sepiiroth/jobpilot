@@ -5,6 +5,7 @@ export default tseslint.config(
       '**/node_modules/**',
       '**/dist/**',
       '**/generated/**',
+      '**/coverage/**',
       '**/.turbo/**',
     ],
   },

@@ -41,3 +41,7 @@ For the optional development seed, set SEED_PASSWORD_HASH in .env to an argon2id
 Vectors have 1024 dimensions in this migration. Changing EMBEDDING_DIMENSIONS requires a matching schema migration, rebuilt indexes and recalculation of stored embeddings; changing an environment variable alone is insufficient. Zero and non-finite vectors are rejected. The similarity repository only returns offers linked to the requested user and excludes ignored matches.
 
 Shared schemas are exported from @jobpilot/shared. Node-only SHA-256 deduplication helpers are exported separately from @jobpilot/shared/dedup to keep node:crypto out of future browser bundles.
+
+## Phase 2: secure API
+
+See [API setup and authentication](docs/api-authentication.md) for startup, account commands, CSRF, sessions, export and key rotation. Start with pnpm --filter @jobpilot/api start after configuring .env.

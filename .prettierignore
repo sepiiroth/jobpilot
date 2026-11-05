@@ -4,3 +4,5 @@ node_modules
 JobPilot — Cahier des charges et plan de développement.md
 
 packages/db/src/generated/
+
+**/coverage/

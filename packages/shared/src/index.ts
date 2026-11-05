@@ -168,3 +168,11 @@ export type NormalizedJobOffer = z.infer<typeof normalizedJobOfferSchema>;
 export type LlmAnalysis = z.infer<typeof llmAnalysisSchema>;
 export type UserSettings = z.infer<typeof settingsSchema>;
 export type JobSourceId = z.infer<typeof jobSourceIdSchema>;
+
+export {
+  loginSchema,
+  changePasswordSchema,
+  deleteAccountSchema,
+  type LoginInput,
+  type ChangePasswordInput,
+} from './auth.ts';

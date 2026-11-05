@@ -1,1 +1,1 @@
-export {};
+export { createApplication } from './application.ts';
