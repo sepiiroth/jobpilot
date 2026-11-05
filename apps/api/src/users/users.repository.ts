@@ -24,6 +24,9 @@ export class UsersRepository {
           settings,
           sessions,
           secrets,
+          collectionSteps,
+          collectionItems,
+          offerEmbeddings,
           offers,
         ] = await Promise.all([
           tx.resume.findMany({ where: { userId } }),
@@ -51,6 +54,9 @@ export class UsersRepository {
             where: { userId },
             select: { id: true, kind: true, keyVersion: true, createdAt: true },
           }),
+          tx.collectionStep.findMany({ where: { userId } }),
+          tx.collectionItem.findMany({ where: { userId } }),
+          tx.offerEmbedding.findMany({ where: { userId } }),
           tx.jobOffer.findMany({
             where: {
               OR: [
@@ -62,7 +68,7 @@ export class UsersRepository {
           }),
         ]);
         return {
-          schemaVersion: 1,
+          schemaVersion: 2,
           exportedAt: new Date().toISOString(),
           user,
           resumes,
@@ -78,6 +84,9 @@ export class UsersRepository {
           sessions,
           secrets,
           offers,
+          collectionSteps,
+          collectionItems,
+          offerEmbeddings,
         };
       },
       { isolationLevel: 'RepeatableRead' },

@@ -111,13 +111,14 @@ export class LlmService {
   async embed(
     userId: string,
     text: string,
+    purpose = 'resume_embedding',
   ): Promise<{ embedding: number[]; provider: string; model: string }> {
     if (!text.trim() || Buffer.byteLength(text) > 100000)
       throw new LlmError('LLM_INVALID_OUTPUT');
     const selected = await this.selection(userId, 'embedding');
     const embedding = await this.call(
       userId,
-      'resume_embedding',
+      purpose,
       selected,
       null,
       Buffer.byteLength(text) + 1024,

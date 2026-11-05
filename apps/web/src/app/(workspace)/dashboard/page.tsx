@@ -1,3 +1,4 @@
+import { CollectionPanel } from '@/components/collection-panel';
 import { getTranslations } from 'next-intl/server';
 import {
   ArrowUpRight,
@@ -5,9 +6,7 @@ import {
   Search,
   Sparkles,
   Compass,
-  Plus,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 export const metadata = { title: 'Tableau de bord' };
@@ -42,18 +41,8 @@ export default async function Dashboard() {
           <h1>{t('title')}</h1>
           <p className="intro-description">{t('description')}</p>
         </div>
-        <div className="collection-placeholder">
-          <Button
-            disabled
-            className="collection-button"
-            aria-describedby="collect-note"
-          >
-            <Plus className="size-4" aria-hidden="true" />
-            {t('collect')}
-          </Button>
-          <p id="collect-note">{t('collectNote')}</p>
-        </div>
       </section>
+      <CollectionPanel />
       <section aria-labelledby="overview-heading" className="overview-section">
         <div className="section-title">
           <h2 id="overview-heading">{t('overview')}</h2>

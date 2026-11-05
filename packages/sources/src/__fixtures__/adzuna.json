@@ -1,0 +1,21 @@
+{
+  "results": [
+    {
+      "id": "example-adzuna",
+      "title": "Javascript Developer",
+      "salary_min": 50000,
+      "salary_max": 55000,
+      "salary_is_predicted": 0,
+      "company": {
+        "display_name": "Example Company"
+      },
+      "location": {
+        "display_name": "Marlow, Buckinghamshire"
+      },
+      "description": "JavaScript Developer Corporate ...",
+      "created": "2013-11-08T18:07:39Z",
+      "redirect_url": "https://example.invalid/adzuna/101",
+      "contract_type": "permanent"
+    }
+  ]
+}

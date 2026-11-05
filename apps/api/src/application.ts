@@ -1,3 +1,11 @@
+import { BullModule, getQueueToken } from '@nestjs/bullmq';
+import type { Queue } from 'bullmq';
+import { queueConnection } from '@jobpilot/shared/collection';
+import { CollectionRepository } from '@jobpilot/db';
+import {
+  CollectionsController,
+  CollectionsService,
+} from './collections/collections.ts';
 import 'reflect-metadata';
 import { LlmModule, LlmService, type ProviderFactory } from '@jobpilot/llm';
 import { ResumeEmbeddings } from './resumes/resume-embeddings.ts';
@@ -179,6 +187,29 @@ export async function createApplication(
   })(SettingsModule);
   class LlmHttpModule {}
   Module({ imports: [llmModule], controllers: [LlmController] })(LlmHttpModule);
+  class CollectionsModule {}
+  Module({
+    imports: [
+      BullModule.forRoot({
+        connection: queueConnection(config.VALKEY_URL),
+        prefix: config.COLLECTION_QUEUE_PREFIX,
+      }),
+      BullModule.registerQueue({ name: 'collection' }),
+    ],
+    controllers: [CollectionsController],
+    providers: [
+      {
+        provide: CollectionsService,
+        useFactory: (queue: Queue) =>
+          new CollectionsService(
+            new CollectionRepository(db),
+            queue,
+            config.COLLECTION_COOLDOWN_MINUTES,
+          ),
+        inject: [getQueueToken('collection')],
+      },
+    ],
+  })(CollectionsModule);
   class AppModule {}
   Module({
     imports: [
@@ -202,6 +233,7 @@ export async function createApplication(
       SettingsModule,
       HealthModule,
       LlmHttpModule,
+      CollectionsModule,
     ],
     providers: [
       { provide: Reflector, useValue: new Reflector() },

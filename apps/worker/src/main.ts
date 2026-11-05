@@ -1,5 +1,12 @@
+import { BullModule, getQueueToken } from '@nestjs/bullmq';
+import type { Queue } from 'bullmq';
+import {
+  collectionEnvironmentSchema,
+  queueConnection,
+} from '@jobpilot/shared/collection';
+import { CollectionRuntime } from './collection/runtime.ts';
 import 'reflect-metadata';
-import { LlmModule, llmEnvironmentSchema } from '@jobpilot/llm';
+import { LlmModule, LlmService, llmEnvironmentSchema } from '@jobpilot/llm';
 import {
   CryptoService,
   cryptoEnvironmentSchema,
@@ -31,7 +38,8 @@ const schema = z
     WORKER_HEALTH_PORT: z.coerce.number().int().min(1).max(65535).default(3002),
   })
   .extend(llmEnvironmentSchema.shape)
-  .extend(cryptoEnvironmentSchema.shape);
+  .extend(cryptoEnvironmentSchema.shape)
+  .extend(collectionEnvironmentSchema.shape);
 try {
   const parsed = schema.safeParse(process.env);
   if (!parsed.success)
@@ -74,10 +82,41 @@ try {
       if (timer) clearTimeout(timer);
     }
   });
+  const queues = [
+    'collection',
+    'embedding',
+    'scoring',
+    'source-adzuna',
+    'source-greenhouse',
+    'source-lever',
+    'source-ashby',
+  ];
   class WorkerModule {}
   Module({
-    imports: [LlmModule.forRoot(db, new CryptoService(config), process.env)],
+    imports: [
+      LlmModule.forRoot(db, new CryptoService(config), process.env),
+      BullModule.forRoot({
+        connection: queueConnection(config.VALKEY_URL, true),
+        prefix: config.COLLECTION_QUEUE_PREFIX,
+      }),
+      BullModule.registerQueue(...queues.map((name) => ({ name }))),
+    ],
     providers: [
+      {
+        provide: CollectionRuntime,
+        useFactory: (llm: LlmService, ...instances: Queue[]) =>
+          new CollectionRuntime(db, llm, new CryptoService(config), config, {
+            collection: instances[0]!,
+            embedding: instances[1]!,
+            scoring: instances[2]!,
+            permits: new Map(
+              queues
+                .slice(3)
+                .map((name, i) => [name.slice(7), instances[i + 3]!]),
+            ),
+          }),
+        inject: [LlmService, ...queues.map((name) => getQueueToken(name))],
+      },
       {
         provide: 'WORKER_RESOURCES',
         useValue: {
@@ -96,12 +135,13 @@ try {
     abortOnError: false,
   });
   app.enableShutdownHooks();
+  await app.get(CollectionRuntime).start();
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
     server.listen(config.WORKER_HEALTH_PORT, '127.0.0.1', () => resolve());
   });
   ready = true;
-  console.log('Worker started; no jobs configured');
+  console.log('Worker started; collection and embedding queues ready');
 } catch (error) {
   console.error(
     error instanceof Error &&

@@ -6,12 +6,14 @@
   "scripts": {
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "test": "node --test",
+    "test": "vitest run",
     "start": "node --env-file-if-exists=../../.env --import tsx src/main.ts"
   },
   "devDependencies": {
     "@jobpilot/config": "workspace:*",
-    "@types/node": "24.10.1"
+    "@types/node": "24.10.1",
+    "vitest": "5.1.0",
+    "testcontainers": "12.2.1"
   },
   "dependencies": {
     "@jobpilot/db": "workspace:*",
@@ -23,7 +25,10 @@
     "zod": "4.6.7",
     "tsx": "4.23.15",
     "@jobpilot/llm": "workspace:*",
-    "@jobpilot/shared": "workspace:*"
+    "@jobpilot/shared": "workspace:*",
+    "bullmq": "6.7.0",
+    "@nestjs/bullmq": "12.0.0",
+    "@jobpilot/sources": "workspace:*"
   },
   "files": [
     "src"

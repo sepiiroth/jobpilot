@@ -1,3 +1,4 @@
+import { collectionEnvironmentSchema } from '@jobpilot/shared/collection';
 import { llmEnvironmentSchema } from '@jobpilot/llm/config';
 import { z } from 'zod';
 const key = z
@@ -57,6 +58,7 @@ export const environmentSchema = z
     APP_NAME: z.string().default('JobPilot'),
   })
   .extend(llmEnvironmentSchema.shape)
+  .extend(collectionEnvironmentSchema.shape)
   .superRefine((v, c) => {
     if (v.NODE_ENV === 'production' && !v.WEB_ORIGIN.startsWith('https://'))
       c.addIssue({

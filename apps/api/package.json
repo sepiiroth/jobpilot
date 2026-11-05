@@ -49,7 +49,10 @@
     "react": "19.1.10",
     "react-dom": "19.1.10",
     "@jobpilot/llm": "workspace:*",
-    "unpdf": "2.1.0"
+    "unpdf": "2.1.0",
+    "bullmq": "6.7.0",
+    "@nestjs/bullmq": "12.0.0",
+    "@jobpilot/sources": "workspace:*"
   },
   "files": [
     "src",

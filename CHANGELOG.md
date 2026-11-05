@@ -34,3 +34,7 @@
 - Meter calls with atomic monthly token reservations, bounded retries and optional cost rates.
 - Import PDFs into editable review drafts without changing master resumes.
 - Calculate resume embeddings on save, preserve data on failure and invalidate stale vectors after settings changes.
+- Add phase 7 BullMQ collection and embedding workers with durable run recovery and source rate limits.
+- Collect and normalize authorized Adzuna, Greenhouse, Lever and Ashby APIs with anonymized fixture tests.
+- Deduplicate offers, preserve ignored matches and isolate embeddings by user, model and content.
+- Add protected collection endpoints, concurrent-start protection, SSE and French dashboard progress reports.

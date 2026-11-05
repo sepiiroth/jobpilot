@@ -1,0 +1,41 @@
+[
+  {
+    "id": "example-lever",
+    "text": "Example Engineer",
+    "hostedUrl": "https://example.invalid/lever/101",
+    "categories": {
+      "commitment": "Regular Full Time (Salary)",
+      "department": "Customer Success",
+      "location": "Atlanta, Georgia",
+      "team": "Customer Success Team",
+      "allLocations": ["Atlanta, Georgia"]
+    },
+    "descriptionPlain": "[Description removed during anonymization]",
+    "lists": [
+      {
+        "text": "[Section]",
+        "content": "<p>[Content removed]</p>"
+      },
+      {
+        "text": "[Section]",
+        "content": "<p>[Content removed]</p>"
+      },
+      {
+        "text": "[Section]",
+        "content": "<p>[Content removed]</p>"
+      },
+      {
+        "text": "[Section]",
+        "content": "<p>[Content removed]</p>"
+      }
+    ],
+    "createdAt": 1788199939703,
+    "workplaceType": "hybrid",
+    "salaryRange": {
+      "min": 85000,
+      "max": 175000,
+      "currency": "USD",
+      "interval": "per-year-salary"
+    }
+  }
+]

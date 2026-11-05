@@ -1,3 +1,4 @@
+import { collectionRunSchema } from '@jobpilot/shared/collection';
 import { importProposalSchema, usageSummarySchema } from '@jobpilot/shared/llm';
 import { z } from 'zod';
 import {
@@ -94,6 +95,12 @@ export function createApiClient(fetcher: typeof fetch = fetch) {
     }
   }
   return {
+    latestCollection: async () =>
+      collectionRunSchema.nullable().parse(await send('/collections')),
+    collection: async (id: string) =>
+      collectionRunSchema.parse(await send('/collections/' + id)),
+    startCollection: async () =>
+      collectionRunSchema.parse(await write('/collections', {})),
     importResume: async (file: File) =>
       importProposalSchema.parse(await write('/resumes/import', file)),
     reindexResume: async (id: string) =>

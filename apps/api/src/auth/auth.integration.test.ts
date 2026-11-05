@@ -1,3 +1,5 @@
+import { getQueueToken } from '@nestjs/bullmq';
+import type { Queue } from 'bullmq';
 import type { z } from 'zod';
 import {
   LlmService,
@@ -967,4 +969,68 @@ it('does not overwrite a newer resume embedding with a late result', async () =>
     1,
     ...Array<number>(1022).fill(0),
   ]);
+});
+
+it('coalesces two fast collection requests, keeps queue payloads private and enforces ownership', async () => {
+  const owner = await browserAs(userId),
+    stranger = await browserAs(otherId);
+  const resume = await profileWrite(owner, '/resumes', resumeInput).expect(200);
+  await profileWrite(owner, '/searches', {
+    name: 'Private search',
+    resumeId: String(resume.body.id),
+    titles: ['Private title'],
+    remote: [],
+    contractTypes: [],
+    sources: ['greenhouse'],
+  }).expect(200);
+  const [a, b] = await Promise.all([
+    profileWrite(owner, '/collections', {}).expect(200),
+    profileWrite(owner, '/collections', {}).expect(200),
+  ]);
+  expect(a.body.id).toBe(b.body.id);
+  const job = await app
+    .get<Queue>(getQueueToken('collection'))
+    .getJob(String(a.body.id));
+  expect(job?.data).toEqual({ runId: a.body.id, userId });
+  const id = String(a.body.id);
+  expect(await db.collectionRun.count({ where: { userId } })).toBe(1);
+  await request(server)
+    .get('/collections/' + id)
+    .set('Cookie', stranger.cookie)
+    .expect(404);
+  await request(server)
+    .get('/collections/' + id + '/events')
+    .set('Cookie', stranger.cookie)
+    .expect(404);
+  await db.collectionRun.update({
+    where: { id },
+    data: { status: 'completed', finishedAt: new Date() },
+  });
+  await profileWrite(owner, '/collections', {}).expect(429);
+  const events = await request(server)
+    .get('/collections/' + id + '/events')
+    .set('Cookie', owner.cookie)
+    .expect(200);
+  expect(events.text).toContain('data:');
+  expect(events.text).not.toContain('Private title');
+  const current = await request(server)
+    .get('/collections')
+    .set('Cookie', stranger.cookie)
+    .expect(200);
+  expect(current.body).toBeNull();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(logs).not.toContain('Private title');
+});
+it('rejects collection requests without active searches or CSRF', async () => {
+  const owner = await browserAs(userId);
+  await profileWrite(owner, '/collections', {}).expect(409);
+  await request(server)
+    .post('/collections')
+    .set('Cookie', owner.cookie)
+    .send({})
+    .expect(403);
+  await request(server)
+    .get('/collections/not-a-uuid')
+    .set('Cookie', owner.cookie)
+    .expect(400);
 });

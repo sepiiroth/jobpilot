@@ -25,6 +25,9 @@ model User {
   application       Application[]
   llmUsage          LlmUsage[]
   auditLog          AuditLog[]
+  collectionStep    CollectionStep[]
+  collectionItem    CollectionItem[]
+  offerEmbedding    OfferEmbedding[]
 
   @@map("users")
 }
@@ -154,7 +157,10 @@ model JobOffer {
 
   documents GeneratedDocument[] @relation("GeneratedDocument_jobOffer")
 
-  matches UserJobMatch[] @relation("UserJobMatch_jobOffer")
+  matches   UserJobMatch[]   @relation("UserJobMatch_jobOffer")
+  aliases   JobOfferAlias[]
+  collected CollectionItem[]
+  vectors   OfferEmbedding[]
 
   id             String                       @id @default(dbgenerated("uuidv7()")) @db.Uuid
   createdAt      DateTime                     @default(now()) @db.Timestamptz
@@ -162,6 +168,7 @@ model JobOffer {
   externalId     String
   dedupKey       String
   url            String
+  contentHash    String                       @default("")
   alternateUrls  String[]
   title          String
   company        String
@@ -205,16 +212,21 @@ model UserJobMatch {
 }
 
 model CollectionRun {
-  id         String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  createdAt  DateTime  @default(now()) @db.Timestamptz
-  trigger    String
-  status     String    @default("queued")
-  startedAt  DateTime? @db.Timestamptz
-  finishedAt DateTime? @db.Timestamptz
-  stats      Json      @default("{}") @db.JsonB
-  errors     Json      @default("[]") @db.JsonB
-  userId     String    @db.Uuid
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  steps       CollectionStep[]
+  items       CollectionItem[]
+  enqueuedAt  DateTime?        @db.Timestamptz
+  heartbeatAt DateTime?        @db.Timestamptz
+  workerToken String?          @db.Uuid
+  id          String           @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  createdAt   DateTime         @default(now()) @db.Timestamptz
+  trigger     String
+  status      String           @default("queued")
+  startedAt   DateTime?        @db.Timestamptz
+  finishedAt  DateTime?        @db.Timestamptz
+  stats       Json             @default("{}") @db.JsonB
+  errors      Json             @default("[]") @db.JsonB
+  userId      String           @db.Uuid
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, id])
   @@index([userId])
@@ -309,4 +321,68 @@ model AuditLog {
   @@unique([userId, id])
   @@index([userId])
   @@map("audit_logs")
+}
+
+model CollectionStep {
+  id       String           @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId   String           @db.Uuid
+  runId    String           @db.Uuid
+  searchId String           @db.Uuid
+  source   String
+  criteria Json             @db.JsonB
+  status   String           @default("queued")
+  errors   Json             @default("[]") @db.JsonB
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  run      CollectionRun    @relation(fields: [userId, runId], references: [userId, id], onDelete: Cascade)
+  items    CollectionItem[]
+
+  @@unique([userId, id])
+  @@unique([runId, searchId, source])
+  @@map("collection_steps")
+}
+
+model CollectionItem {
+  id         String         @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId     String         @db.Uuid
+  runId      String         @db.Uuid
+  stepId     String         @db.Uuid
+  externalId String
+  jobOfferId String         @db.Uuid
+  isNew      Boolean
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  run        CollectionRun  @relation(fields: [userId, runId], references: [userId, id], onDelete: Cascade)
+  step       CollectionStep @relation(fields: [userId, stepId], references: [userId, id], onDelete: Cascade)
+  offer      JobOffer       @relation(fields: [jobOfferId], references: [id], onDelete: Cascade)
+
+  @@unique([stepId, externalId])
+  @@index([userId, runId])
+  @@map("collection_items")
+}
+
+model JobOfferAlias {
+  sourceId   String
+  externalId String
+  jobOfferId String   @db.Uuid
+  offer      JobOffer @relation(fields: [jobOfferId], references: [id], onDelete: Cascade)
+
+  @@id([sourceId, externalId])
+  @@map("job_offer_aliases")
+}
+
+model OfferEmbedding {
+  id          String                       @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId      String                       @db.Uuid
+  jobOfferId  String                       @db.Uuid
+  profileKey  String
+  contentHash String
+  provider    String
+  model       String
+  status      String                       @default("pending")
+  embedding   Unsupported("vector(1024)")?
+  user        User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offer       JobOffer                     @relation(fields: [jobOfferId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobOfferId, profileKey, contentHash])
+  @@index([userId, status])
+  @@map("offer_embeddings")
 }

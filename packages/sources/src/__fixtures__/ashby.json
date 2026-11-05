@@ -1,0 +1,25 @@
+{
+  "jobs": [
+    {
+      "id": "example-ashby",
+      "title": "Example Engineer",
+      "location": "Remote - European Union",
+      "employmentType": "FullTime",
+      "isListed": true,
+      "isRemote": true,
+      "workplaceType": "Remote",
+      "address": {
+        "postalAddress": {
+          "postalCode": "",
+          "addressRegion": "",
+          "addressCountry": "European Union",
+          "addressLocality": ""
+        }
+      },
+      "publishedAt": "2024-03-04T14:29:08.532+00:00",
+      "jobUrl": "https://example.invalid/ashby/101",
+      "descriptionHtml": "<p>[Description removed during anonymization]</p>",
+      "descriptionPlain": "[Description removed during anonymization]"
+    }
+  ]
+}

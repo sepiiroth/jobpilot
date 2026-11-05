@@ -1,6 +1,6 @@
 # JobPilot
 
-Self-hosted job search assistant. Phase 0 provides tooling only; application services are not implemented yet.
+Self-hosted job search assistant. Includes secure accounts, resumes, searches, AI-assisted PDF import and manual collection from authorized job APIs.
 
 ## Setup
 
@@ -61,3 +61,7 @@ See [manual profiles and encrypted settings](docs/profiles-and-settings.md) for 
 ## Phase 6: AI and resume import
 
 See [LLM configuration and PDF import](docs/llm-and-resume-import.md) for providers, review before saving, embedding states, quotas, endpoint policy and verification.
+
+## Phase 7: job collection
+
+See [collection setup and verification](docs/collection.md) for source configuration, manual runs, limits, progress, recovery and private offer embeddings. Run the API and worker alongside the web app.

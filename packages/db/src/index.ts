@@ -11,3 +11,9 @@ export function createDatabaseClient(
   return new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
 }
 export { VectorRepository } from './vector-repository.ts';
+export {
+  CollectionRepository,
+  CollectionConflict,
+  embeddingProfile,
+  offerContentHash,
+} from './collection-repository.ts';
