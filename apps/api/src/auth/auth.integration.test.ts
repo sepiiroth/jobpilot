@@ -355,3 +355,302 @@ it('creates accounts and resets passwords through the CLI', async () => {
   expect(await passwords.verify(updated.passwordHash, changed)).toBe(true);
   expect(() => run('invalid')).toThrow();
 });
+
+async function browserAs(id: string): Promise<Browser> {
+  const token = randomBytes(32).toString('base64url');
+  await db.session.create({
+    data: {
+      userId: id,
+      tokenHash: createHash('sha256').update(token).digest('hex'),
+      expiresAt: new Date(Date.now() + 60000),
+    },
+  });
+  const cookie = 'jobpilot_session=' + token;
+  const response = await request(server)
+    .get('/auth/csrf')
+    .set('Cookie', cookie)
+    .expect(200);
+  return {
+    cookie: cookie + '; ' + cookieHeader(response),
+    csrf: String(response.body.csrfToken),
+  };
+}
+function profileWrite(
+  browser: Browser,
+  path: string,
+  value: object,
+  method: 'post' | 'delete' = 'post',
+) {
+  return request(server)
+    [method](path)
+    .set('Cookie', browser.cookie)
+    .set('X-CSRF-Token', browser.csrf)
+    .set('Origin', origin)
+    .send(value);
+}
+const resumeInput = {
+  title: 'Synthetic test CV',
+  data: {
+    basics: {
+      name: 'Camille Exemple',
+      summary: 'Développement logiciel et qualité',
+    },
+    work: [],
+    education: [],
+    skills: [{ name: 'TypeScript', keywords: ['Tests'] }],
+    languages: [],
+    projects: [],
+  },
+  isArchived: false,
+};
+it('isolates resume CRUD and PDF exports between owners', async () => {
+  const owner = await browserAs(userId),
+    stranger = await browserAs(otherId);
+  const created = await profileWrite(owner, '/resumes', {
+    ...resumeInput,
+    userId: otherId,
+  }).expect(400);
+  expect(created.body.error.code).toBe('INVALID_REQUEST');
+  const saved = await profileWrite(owner, '/resumes', resumeInput).expect(200);
+  const id = String(saved.body.id);
+  await expectOwnershipIsolation(
+    async () =>
+      (
+        await request(server)
+          .get('/resumes')
+          .set('Cookie', stranger.cookie)
+          .expect(200)
+      ).body as unknown,
+    id,
+  );
+  for (const path of [`/resumes/${id}`, `/resumes/${id}/pdf`])
+    await request(server).get(path).set('Cookie', stranger.cookie).expect(404);
+  await profileWrite(stranger, `/resumes/${id}`, {
+    ...resumeInput,
+    title: 'Stolen',
+  }).expect(404);
+  await profileWrite(stranger, `/resumes/${id}`, {}, 'delete').expect(404);
+  await profileWrite(owner, `/resumes/${id}`, {
+    ...resumeInput,
+    title: 'Updated CV',
+  }).expect(200);
+  expect(
+    (await db.resume.findFirstOrThrow({ where: { id, userId } })).title,
+  ).toBe('Updated CV');
+  const pdf = await request(server)
+    .get(`/resumes/${id}/pdf`)
+    .set('Cookie', owner.cookie)
+    .expect(200);
+  expect(pdf.headers['content-type']).toContain('application/pdf');
+  expect(pdf.headers['cache-control']).toBe('no-store');
+  await profileWrite(owner, `/resumes/${id}`, {}, 'delete').expect(200);
+});
+it('isolates searches and rejects another owner’s resume association', async () => {
+  const owner = await browserAs(userId),
+    stranger = await browserAs(otherId);
+  const resume = await profileWrite(owner, '/resumes', resumeInput).expect(200);
+  const data = {
+    name: 'Development',
+    resumeId: String(resume.body.id),
+    titles: ['Developer'],
+    remote: ['hybrid'],
+    contractTypes: ['permanent'],
+    locations: [{ city: 'Lyon', country: 'FR' }],
+    sources: ['adzuna'],
+    salaryMin: 42000,
+  };
+  await profileWrite(stranger, '/searches', data).expect(404);
+  const saved = await profileWrite(owner, '/searches', data).expect(200);
+  const id = String(saved.body.id);
+  expect(saved.body.salaryMin).toBe(42000);
+  await expectOwnershipIsolation(
+    async () =>
+      (
+        await request(server)
+          .get('/searches')
+          .set('Cookie', stranger.cookie)
+          .expect(200)
+      ).body as unknown,
+    id,
+  );
+  await request(server)
+    .get(`/searches/${id}`)
+    .set('Cookie', stranger.cookie)
+    .expect(404);
+  await profileWrite(stranger, `/searches/${id}`, data).expect(404);
+  await profileWrite(stranger, `/searches/${id}`, {}, 'delete').expect(404);
+  await profileWrite(owner, `/resumes/${data.resumeId}`, {}, 'delete').expect(
+    409,
+  );
+  await profileWrite(owner, `/searches/${id}`, {
+    ...data,
+    isActive: false,
+  }).expect(200);
+  expect(
+    (await db.search.findFirstOrThrow({ where: { id, userId } })).isActive,
+  ).toBe(false);
+  await profileWrite(owner, `/searches/${id}`, {}, 'delete').expect(200);
+  await profileWrite(owner, `/resumes/${data.resumeId}`, {}, 'delete').expect(
+    200,
+  );
+});
+it('keeps secrets encrypted, write-only, scoped and replaceable', async () => {
+  const owner = await browserAs(userId),
+    stranger = await browserAs(otherId);
+  const value = randomBytes(32).toString('hex');
+  const path = '/settings/secrets/llm_openai';
+  const response = await profileWrite(owner, path, { value }).expect(200);
+  expect(response.body).toEqual({
+    kind: 'llm_openai',
+    configured: true,
+    lastFour: value.slice(-4),
+  });
+  const stored = await db.userSecret.findUniqueOrThrow({
+    where: { userId_kind: { userId, kind: 'llm_openai' } },
+  });
+  expect(Buffer.from(stored.ciphertext).toString()).not.toBe(value);
+  expect(stored.iv.byteLength).toBe(12);
+  const listed = await request(server)
+    .get('/settings/secrets')
+    .set('Cookie', owner.cookie)
+    .expect(200);
+  expect(JSON.stringify(listed.body)).not.toContain(value);
+  expect(JSON.stringify(listed.body)).not.toMatch(
+    /ciphertext|authTag|keyVersion/,
+  );
+  const other = await request(server)
+    .get(path)
+    .set('Cookie', stranger.cookie)
+    .expect(200);
+  expect(other.body).toEqual({
+    kind: 'llm_openai',
+    configured: false,
+    lastFour: null,
+  });
+  await profileWrite(stranger, path, {}, 'delete').expect(200);
+  expect(await db.userSecret.count({ where: { userId } })).toBe(1);
+  const ownOtherValue = randomBytes(32).toString('hex');
+  await profileWrite(stranger, path, { value: ownOtherValue }).expect(200);
+  expect(
+    (await request(server).get(path).set('Cookie', owner.cookie).expect(200))
+      .body.lastFour,
+  ).toBe(value.slice(-4));
+  const replacement = randomBytes(32).toString('hex');
+  await profileWrite(owner, path, { value: replacement }).expect(200);
+  expect(
+    (await request(server).get(path).set('Cookie', owner.cookie).expect(200))
+      .body.lastFour,
+  ).toBe(replacement.slice(-4));
+  const exported = await request(server)
+    .get('/users/me/export')
+    .set('Cookie', owner.cookie)
+    .expect(200);
+  expect(JSON.stringify(exported.body)).not.toContain(value);
+  expect(JSON.stringify(exported.body)).not.toContain(replacement);
+  await profileWrite(owner, path, {}, 'delete').expect(200);
+  expect(
+    (await request(server).get(path).set('Cookie', owner.cookie).expect(200))
+      .body.configured,
+  ).toBe(false);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(logs).not.toContain(value);
+  expect(logs).not.toContain(replacement);
+});
+it('persists provider and IMAP preferences without leaking to another user', async () => {
+  const owner = await browserAs(userId),
+    stranger = await browserAs(otherId);
+  const input = {
+    llmProvider: 'ollama',
+    generationModel: 'local-generation',
+    scoringModel: 'local-scoring',
+    embeddingProvider: 'ollama',
+    embeddingModel: 'bge-m3',
+    ollamaBaseUrl: 'http://localhost:11434',
+    imap: {
+      host: 'imap.example.invalid',
+      port: 993,
+      username: 'alerts@example.invalid',
+      mailbox: 'INBOX',
+      allowedSenders: ['alerts@example.invalid'],
+    },
+  };
+  await profileWrite(owner, '/settings', input).expect(200);
+  expect(
+    (
+      await request(server)
+        .get('/settings')
+        .set('Cookie', owner.cookie)
+        .expect(200)
+    ).body,
+  ).toEqual(input);
+  const other = await request(server)
+    .get('/settings')
+    .set('Cookie', stranger.cookie)
+    .expect(200);
+  expect(other.body.imap).toBeNull();
+  expect(other.body.generationModel).not.toBe(input.generationModel);
+  await profileWrite(owner, '/settings', {
+    ...input,
+    imap: { ...input.imap, password: randomBytes(16).toString('hex') },
+  }).expect(400);
+  await profileWrite(owner, '/settings', {
+    ...input,
+    ollamaBaseUrl: 'file:///etc/passwd',
+  }).expect(400);
+  await profileWrite(owner, '/settings', { ...input, imap: null }).expect(200);
+});
+it('isolates tracked companies and validates public ATS identifiers', async () => {
+  const owner = await browserAs(userId),
+    stranger = await browserAs(otherId);
+  const input = {
+    name: 'Example ATS',
+    atsType: 'greenhouse',
+    atsToken: 'example-test',
+  };
+  const response = await profileWrite(
+    owner,
+    '/settings/companies',
+    input,
+  ).expect(200);
+  const id = String(response.body.id);
+  await request(server)
+    .get(`/settings/companies/${id}`)
+    .set('Cookie', stranger.cookie)
+    .expect(404);
+  await profileWrite(stranger, `/settings/companies/${id}`, input).expect(404);
+  await profileWrite(
+    stranger,
+    `/settings/companies/${id}`,
+    {},
+    'delete',
+  ).expect(404);
+  await profileWrite(owner, '/settings/companies', input).expect(409);
+  await profileWrite(owner, `/settings/companies/${id}`, {
+    ...input,
+    atsType: 'lever',
+  }).expect(200);
+  await profileWrite(owner, '/settings/companies', {
+    ...input,
+    atsToken: '../../private',
+  }).expect(400);
+  await profileWrite(owner, `/settings/companies/${id}`, {}, 'delete').expect(
+    200,
+  );
+});
+it('requires authentication, CSRF and valid data on profile routes', async () => {
+  await request(server).get('/resumes').expect(401);
+  const owner = await browserAs(userId);
+  await request(server)
+    .post('/resumes')
+    .set('Cookie', owner.cookie)
+    .send(resumeInput)
+    .expect(403);
+  await profileWrite(owner, '/resumes', { title: '', data: {} }).expect(400);
+  await request(server)
+    .get('/resumes/not-a-uuid')
+    .set('Cookie', owner.cookie)
+    .expect(400);
+  await profileWrite(owner, '/settings/secrets/not-a-kind', {
+    value: randomBytes(32).toString('hex'),
+  }).expect(400);
+});

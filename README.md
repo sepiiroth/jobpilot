@@ -53,3 +53,7 @@ See [web setup and verification](docs/web.md) for the French Next.js shell, logi
 ## Phase 4: container deployment
 
 Follow [the CapRover deployment guide](docs/deployment-caprover.md) to configure the five apps and release images. The local smoke stack verifies isolated production containers without touching the normal development database.
+
+## Phase 5: resumes, searches and settings
+
+See [manual profiles and encrypted settings](docs/profiles-and-settings.md) for the resume editor, PDF export, search criteria, ATS companies and write-only credentials. Run `pnpm db:generate` and `pnpm db:migrate` before starting the updated API.

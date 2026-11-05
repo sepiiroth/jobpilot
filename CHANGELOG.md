@@ -25,3 +25,7 @@
 - Document CapRover setup, registry access, environment variables, account creation and rollback.
 
 - Recover API and worker Valkey connections after transient startup or service interruptions.
+
+- Add phase 5 resume and search CRUD with authenticated ownership checks and section-based French forms.
+- Add encrypted write-only credentials, provider preferences, ATS companies and stored IMAP configuration.
+- Export master resumes as selectable single-column PDFs and verify text extraction and multi-page output.

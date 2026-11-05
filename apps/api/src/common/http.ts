@@ -2,6 +2,7 @@ import {
   Req,
   Res,
   HttpCode,
+  Header,
   SetMetadata,
   type CustomDecorator,
 } from '@nestjs/common';
@@ -17,6 +18,7 @@ export function route(
   if (!descriptor) throw new Error('Missing route method');
   decorator(target, name, descriptor);
   HttpCode(200)(target, name, descriptor);
+  Header('Cache-Control', 'no-store')(target, name, descriptor);
   Req()(target, name, 0);
   Res({ passthrough: true })(target, name, 1);
   if (isPublic) Public()(target, name, descriptor);

@@ -24,3 +24,5 @@ docs
 README.md
 CHANGELOG.md
 JobPilot*.md
+
+.pnpm-store

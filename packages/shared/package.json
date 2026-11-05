@@ -15,7 +15,8 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./dedup": "./src/dedup.ts"
+    "./dedup": "./src/dedup.ts",
+    "./profile": "./src/profile.ts"
   },
   "dependencies": {
     "zod": "4.6.7"

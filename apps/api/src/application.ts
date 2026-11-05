@@ -33,6 +33,15 @@ import { CryptoService } from './crypto/crypto.service.ts';
 import { HealthController } from './health/health.controller.ts';
 import { GlobalErrorFilter } from './common/errors.ts';
 import { loggingOptions } from './logging.ts';
+import { ResumesController } from './resumes/resumes.controller.ts';
+import { ResumesService } from './resumes/resumes.service.ts';
+import { ResumesRepository } from './resumes/resumes.repository.ts';
+import { SearchesController } from './searches/searches.controller.ts';
+import { SearchesService } from './searches/searches.service.ts';
+import { SearchesRepository } from './searches/searches.repository.ts';
+import { SettingsController } from './settings/settings.controller.ts';
+import { SettingsService } from './settings/settings.service.ts';
+import { SettingsRepository } from './settings/settings.repository.ts';
 export interface ApplicationResources {
   db: PrismaClient;
   redis: Redis;
@@ -111,6 +120,39 @@ export async function createApplication(
     imports: [InfrastructureModule, TerminusModule],
     controllers: [HealthController],
   })(HealthModule);
+  class ResumesModule {}
+  Module({
+    controllers: [ResumesController],
+    providers: [
+      {
+        provide: ResumesService,
+        useValue: new ResumesService(new ResumesRepository(db)),
+      },
+    ],
+  })(ResumesModule);
+  class SearchesModule {}
+  Module({
+    controllers: [SearchesController],
+    providers: [
+      {
+        provide: SearchesService,
+        useValue: new SearchesService(new SearchesRepository(db)),
+      },
+    ],
+  })(SearchesModule);
+  class SettingsModule {}
+  Module({
+    controllers: [SettingsController],
+    providers: [
+      {
+        provide: SettingsService,
+        useValue: new SettingsService(
+          new SettingsRepository(db),
+          new CryptoService(config),
+        ),
+      },
+    ],
+  })(SettingsModule);
   class AppModule {}
   Module({
     imports: [
@@ -129,6 +171,9 @@ export async function createApplication(
       CryptoModule,
       AuthModule,
       UsersModule,
+      ResumesModule,
+      SearchesModule,
+      SettingsModule,
       HealthModule,
     ],
     providers: [

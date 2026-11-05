@@ -7,6 +7,22 @@ import {
   type LoginInput,
   type CurrentUser,
 } from '@jobpilot/shared';
+import {
+  resumeInputSchema,
+  resumeRecordSchema,
+  searchInputSchema,
+  searchRecordSchema,
+  profileSettingsSchema,
+  secretStatusSchema,
+  secretInputSchema,
+  companyInputSchema,
+  companyRecordSchema,
+  type ResumeInput,
+  type SearchInput,
+  type ProfileSettings,
+  type SecretKind,
+  type CompanyInput,
+} from '@jobpilot/shared/profile';
 import { apiOrigin } from './environment.ts';
 export class ApiClientError extends Error {
   readonly status: number;
@@ -20,7 +36,7 @@ export class ApiClientError extends Error {
 export function createApiClient(fetcher: typeof fetch = fetch) {
   let csrfToken: string | undefined;
   let pendingCsrf: Promise<string> | undefined;
-  async function send(path: string, options: RequestInit = {}) {
+  async function send(path: string, options: RequestInit = {}, binary = false) {
     const response = await fetcher(apiOrigin + path, {
       ...options,
       credentials: 'include',
@@ -36,6 +52,7 @@ export function createApiClient(fetcher: typeof fetch = fetch) {
         error.success ? error.data.error.code : 'REQUEST_FAILED',
       );
     }
+    if (binary) return response.blob();
     return response.json() as Promise<unknown>;
   }
   async function getCsrf() {
@@ -51,10 +68,10 @@ export function createApiClient(fetcher: typeof fetch = fetch) {
         });
     return pendingCsrf;
   }
-  async function write(path: string, payload: unknown) {
+  async function write(path: string, payload: unknown, method = 'POST') {
     const perform = async () =>
       send(path, {
-        method: 'POST',
+        method,
         headers: {
           'Content-Type': 'application/json',
           'X-CSRF-Token': await getCsrf(),
@@ -72,6 +89,62 @@ export function createApiClient(fetcher: typeof fetch = fetch) {
     }
   }
   return {
+    resumes: async () =>
+      z.array(resumeRecordSchema).parse(await send('/resumes')),
+    saveResume: async (id: string | undefined, value: ResumeInput) =>
+      resumeRecordSchema.parse(
+        await write(
+          '/resumes' + (id ? '/' + id : ''),
+          resumeInputSchema.parse(value),
+        ),
+      ),
+    deleteResume: async (id: string) => {
+      await write('/resumes/' + id, {}, 'DELETE');
+    },
+    resumePdf: async (id: string) =>
+      z.instanceof(Blob).parse(await send('/resumes/' + id + '/pdf', {}, true)),
+    searches: async () =>
+      z.array(searchRecordSchema).parse(await send('/searches')),
+    saveSearch: async (id: string | undefined, value: SearchInput) =>
+      searchRecordSchema.parse(
+        await write(
+          '/searches' + (id ? '/' + id : ''),
+          searchInputSchema.parse(value),
+        ),
+      ),
+    deleteSearch: async (id: string) => {
+      await write('/searches/' + id, {}, 'DELETE');
+    },
+    settings: async () => profileSettingsSchema.parse(await send('/settings')),
+    saveSettings: async (value: ProfileSettings) =>
+      profileSettingsSchema.parse(
+        await write('/settings', profileSettingsSchema.parse(value)),
+      ),
+    secrets: async () =>
+      z.array(secretStatusSchema).parse(await send('/settings/secrets')),
+    saveSecret: async (kind: SecretKind, value: string) =>
+      secretStatusSchema.parse(
+        await write(
+          '/settings/secrets/' + kind,
+          secretInputSchema.parse({ value }),
+        ),
+      ),
+    deleteSecret: async (kind: SecretKind) =>
+      secretStatusSchema.parse(
+        await write('/settings/secrets/' + kind, {}, 'DELETE'),
+      ),
+    companies: async () =>
+      z.array(companyRecordSchema).parse(await send('/settings/companies')),
+    saveCompany: async (id: string | undefined, value: CompanyInput) =>
+      companyRecordSchema.parse(
+        await write(
+          '/settings/companies' + (id ? '/' + id : ''),
+          companyInputSchema.parse(value),
+        ),
+      ),
+    deleteCompany: async (id: string) => {
+      await write('/settings/companies/' + id, {}, 'DELETE');
+    },
     async me(): Promise<CurrentUser | null> {
       try {
         return currentUserSchema.parse(await send('/auth/me'));

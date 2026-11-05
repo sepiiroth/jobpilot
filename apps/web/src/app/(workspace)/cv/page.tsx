@@ -1,5 +1,5 @@
-import { PlaceholderPage } from '@/components/placeholder-page';
+import { ResumesPage } from '@/components/profile/resumes-page';
 export const metadata = { title: 'CV' };
 export default function Page() {
-  return <PlaceholderPage section="resumes" />;
+  return <ResumesPage />;
 }
