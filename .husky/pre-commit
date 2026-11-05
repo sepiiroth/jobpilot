@@ -1,0 +1,2 @@
+gitleaks protect --staged --redact || exit 1
+pnpm exec lint-staged

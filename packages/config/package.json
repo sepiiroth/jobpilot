@@ -1,0 +1,11 @@
+{
+  "name": "@jobpilot/config",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./eslint": "./eslint.config.mjs",
+    "./prettier": "./prettier.config.mjs",
+    "./tsconfig": "./tsconfig.json"
+  }
+}
