@@ -1,4 +1,7 @@
 import 'reflect-metadata';
+import { LlmModule, LlmService, type ProviderFactory } from '@jobpilot/llm';
+import { ResumeEmbeddings } from './resumes/resume-embeddings.ts';
+import { LlmController } from './llm/llm.controller.ts';
 import { Module } from '@nestjs/common';
 import { NestFactory, APP_GUARD, Reflector } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
@@ -46,6 +49,7 @@ export interface ApplicationResources {
   db: PrismaClient;
   redis: Redis;
   logs?: DestinationStream;
+  llmFactory?: ProviderFactory;
 }
 export async function createApplication(
   input: unknown = process.env,
@@ -120,13 +124,28 @@ export async function createApplication(
     imports: [InfrastructureModule, TerminusModule],
     controllers: [HealthController],
   })(HealthModule);
+  const llmModule = LlmModule.forRoot(
+    db,
+    new CryptoService(config),
+    input,
+    resources?.llmFactory,
+  );
   class ResumesModule {}
   Module({
+    imports: [llmModule],
     controllers: [ResumesController],
+    exports: [ResumeEmbeddings],
     providers: [
       {
+        provide: ResumeEmbeddings,
+        useFactory: (llm: LlmService) => new ResumeEmbeddings(db, llm),
+        inject: [LlmService],
+      },
+      {
         provide: ResumesService,
-        useValue: new ResumesService(new ResumesRepository(db)),
+        useFactory: (embeddings: ResumeEmbeddings, llm: LlmService) =>
+          new ResumesService(new ResumesRepository(db), embeddings, llm),
+        inject: [ResumeEmbeddings, LlmService],
       },
     ],
   })(ResumesModule);
@@ -142,17 +161,24 @@ export async function createApplication(
   })(SearchesModule);
   class SettingsModule {}
   Module({
+    imports: [ResumesModule],
     controllers: [SettingsController],
     providers: [
       {
         provide: SettingsService,
-        useValue: new SettingsService(
-          new SettingsRepository(db),
-          new CryptoService(config),
-        ),
+        useFactory: (embeddings: ResumeEmbeddings) =>
+          new SettingsService(
+            new SettingsRepository(db),
+            new CryptoService(config),
+            embeddings,
+            config,
+          ),
+        inject: [ResumeEmbeddings],
       },
     ],
   })(SettingsModule);
+  class LlmHttpModule {}
+  Module({ imports: [llmModule], controllers: [LlmController] })(LlmHttpModule);
   class AppModule {}
   Module({
     imports: [
@@ -175,6 +201,7 @@ export async function createApplication(
       SearchesModule,
       SettingsModule,
       HealthModule,
+      LlmHttpModule,
     ],
     providers: [
       { provide: Reflector, useValue: new Reflector() },
@@ -204,6 +231,7 @@ export async function createApplication(
   app.set('trust proxy', config.TRUST_PROXY_HOPS);
   app.disable('x-powered-by');
   app.use(helmet());
+  app.useBodyParser('raw', { type: 'application/pdf', limit: '5mb' });
   app.useBodyParser('json', { limit: '1mb' });
   app.use(cookieParser());
   app.enableCors({

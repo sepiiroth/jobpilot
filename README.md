@@ -57,3 +57,7 @@ Follow [the CapRover deployment guide](docs/deployment-caprover.md) to configure
 ## Phase 5: resumes, searches and settings
 
 See [manual profiles and encrypted settings](docs/profiles-and-settings.md) for the resume editor, PDF export, search criteria, ATS companies and write-only credentials. Run `pnpm db:generate` and `pnpm db:migrate` before starting the updated API.
+
+## Phase 6: AI and resume import
+
+See [LLM configuration and PDF import](docs/llm-and-resume-import.md) for providers, review before saving, embedding states, quotas, endpoint policy and verification.

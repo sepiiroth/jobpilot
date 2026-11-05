@@ -1,3 +1,4 @@
+import { LlmError } from '@jobpilot/llm';
 import {
   Catch,
   HttpException,
@@ -15,6 +16,20 @@ export class ApiError extends HttpException {
 }
 export class GlobalErrorFilter implements ExceptionFilter {
   catch(error: unknown, host: ArgumentsHost): void {
+    if (error instanceof LlmError)
+      error = new ApiError(
+        error.code === 'LLM_BUDGET_EXCEEDED'
+          ? 429
+          : error.code === 'LLM_NOT_CONFIGURED'
+            ? 409
+            : error.code === 'LLM_INVALID_OUTPUT'
+              ? 422
+              : error.code === 'LLM_ENDPOINT_FORBIDDEN'
+                ? 400
+                : 503,
+        error.code,
+        'AI request could not be completed',
+      );
     const response = host.switchToHttp().getResponse<Response>();
     const parserStatus =
       typeof error === 'object' &&

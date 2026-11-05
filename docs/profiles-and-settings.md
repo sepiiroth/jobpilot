@@ -1,6 +1,6 @@
 # Resumes, searches and user settings
 
-Phase 5 adds manual data entry. AI calls, PDF import, embeddings and collection are implemented in later phases.
+Manual data entry was introduced in phase 5. AI calls, PDF import and resume embeddings are now available; see [the LLM guide](llm-and-resume-import.md). Collection is implemented in a later phase.
 
 ## Setup
 
@@ -30,7 +30,7 @@ Searches may be active or inactive. Sources are stored as preferences; selecting
 
 ## Settings and write-only credentials
 
-Open **Paramètres** to select generation/scoring and embedding providers, exact model identifiers, and the Ollama endpoint. The privacy notice explains external processing and local Ollama. Saving preferences makes no external requests.
+Open **Paramètres** to select generation/scoring and embedding providers, exact model identifiers, and the Ollama endpoint. The privacy notice explains external processing and local Ollama. Saving embedding preferences can start recalculation of saved CV embeddings; see the LLM guide for quota and privacy details.
 
 For IMAP, save the server hostname, TLS port, username, mailbox and authorized sender addresses. Store its password separately under **Clés et mots de passe**. There is no mailbox connection in this phase. The future IMAP connector must enforce TLS, read-only access and hostname/network validation before connecting; a saved hostname is not authorization to bypass those checks.
 

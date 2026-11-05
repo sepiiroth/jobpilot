@@ -4,8 +4,24 @@ import type { Response } from 'express';
 import type { AuthenticatedRequest } from '../auth/security.guard.ts';
 import { route } from '../common/http.ts';
 import { ResumesService } from './resumes.service.ts';
+import { ApiError } from '../common/errors.ts';
 import { renderResumePdf } from './resume-pdf.ts';
 export class ResumesController {
+  importPdf(req: AuthenticatedRequest) {
+    if (!Buffer.isBuffer(req.body))
+      throw new ApiError(
+        415,
+        'INVALID_PDF',
+        'Expected an application/pdf body',
+      );
+    return this.service.proposePdf(req.principal.userId, req.body);
+  }
+  reindex(req: AuthenticatedRequest) {
+    return this.service.reindex(
+      req.principal.userId,
+      z.uuid().parse(req.params.id),
+    );
+  }
   constructor(private readonly service: ResumesService) {}
   list(req: AuthenticatedRequest) {
     return this.service.list(req.principal.userId);
@@ -50,6 +66,8 @@ export class ResumesController {
 }
 Inject(ResumesService)(ResumesController, undefined, 0);
 Controller('resumes')(ResumesController);
+route(ResumesController.prototype, 'importPdf', Post('import'));
+route(ResumesController.prototype, 'reindex', Post(':id/embedding'));
 route(ResumesController.prototype, 'list', Get());
 route(ResumesController.prototype, 'create', Post());
 route(ResumesController.prototype, 'get', Get(':id'));

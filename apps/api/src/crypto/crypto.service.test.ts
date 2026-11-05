@@ -34,3 +34,31 @@ it('authenticates ciphertext, context and version, and rotates old keys', () => 
   expect(next.decrypt(rotated, 'user:source')).toBe(value);
   expect(() => previous.decrypt(rotated, 'user:source')).toThrow();
 });
+
+it('validates shared encryption environment defaults and rejects malformed keys', async () => {
+  const { cryptoEnvironmentSchema } = await import('@jobpilot/shared/crypto');
+  const key = randomBytes(32).toString('base64');
+  expect(
+    cryptoEnvironmentSchema.parse({ ENCRYPTION_KEY: key })
+      .ENCRYPTION_KEY_VERSION,
+  ).toBe(1);
+  expect(
+    cryptoEnvironmentSchema.parse({
+      ENCRYPTION_KEY: key,
+      ENCRYPTION_PREVIOUS_KEYS: JSON.stringify({ '2': key }),
+    }).ENCRYPTION_PREVIOUS_KEYS['2'],
+  ).toBe(key);
+  for (const input of [
+    { ENCRYPTION_KEY: 'short' },
+    { ENCRYPTION_KEY: key, ENCRYPTION_PREVIOUS_KEYS: 'invalid json' },
+    {
+      ENCRYPTION_KEY: key,
+      ENCRYPTION_PREVIOUS_KEYS: JSON.stringify({ bad: key }),
+    },
+    {
+      ENCRYPTION_KEY: key,
+      ENCRYPTION_PREVIOUS_KEYS: JSON.stringify({ '2': 'short' }),
+    },
+  ])
+    expect(cryptoEnvironmentSchema.safeParse(input).success).toBe(false);
+});

@@ -6,9 +6,32 @@
   "scripts": {
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "test": "node --test"
+    "test": "vitest run"
   },
   "devDependencies": {
-    "@jobpilot/config": "workspace:*"
-  }
+    "@jobpilot/config": "workspace:*",
+    "vitest": "5.1.0",
+    "@types/node": "24.10.1"
+  },
+  "dependencies": {
+    "ai": "6.0.323",
+    "@ai-sdk/anthropic": "3.0.138",
+    "@ai-sdk/openai": "3.0.137",
+    "@ai-sdk/mistral": "3.0.79",
+    "@ai-sdk/openai-compatible": "2.0.90",
+    "@ai-sdk/voyage": "1.0.41",
+    "@jobpilot/db": "workspace:*",
+    "@jobpilot/shared": "workspace:*",
+    "@nestjs/common": "12.3.3",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "zod": "4.6.7"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./config": "./src/config.ts"
+  },
+  "files": [
+    "src"
+  ]
 }

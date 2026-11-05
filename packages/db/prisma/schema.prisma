@@ -88,14 +88,18 @@ model Resume {
 
   searches Search[] @relation("Search_resume")
 
-  id         String                       @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  createdAt  DateTime                     @default(now()) @db.Timestamptz
-  title      String
-  data       Json                         @db.JsonB
-  embedding  Unsupported("vector(1024)")?
-  isArchived Boolean                      @default(false)
-  userId     String                       @db.Uuid
-  user       User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String                       @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  createdAt         DateTime                     @default(now()) @db.Timestamptz
+  title             String
+  data              Json                         @db.JsonB
+  embedding         Unsupported("vector(1024)")?
+  embeddingStatus   String                       @default("pending")
+  embeddingProvider String?
+  embeddingModel    String?
+  revision          Int                          @default(1)
+  isArchived        Boolean                      @default(false)
+  userId            String                       @db.Uuid
+  user              User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, id])
   @@index([userId])
@@ -273,19 +277,23 @@ model Application {
 }
 
 model LlmUsage {
-  id           String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  createdAt    DateTime @default(now()) @db.Timestamptz
-  purpose      String
-  provider     String
-  model        String
-  tokensIn     Int
-  tokensOut    Int
-  costEstimate Decimal  @db.Decimal(18, 8)
-  userId       String   @db.Uuid
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  createdAt      DateTime @default(now()) @db.Timestamptz
+  purpose        String
+  provider       String
+  model          String
+  tokensIn       Int
+  tokensOut      Int
+  costEstimate   Decimal? @db.Decimal(18, 8)
+  status         String   @default("succeeded")
+  reservedTokens Int      @default(0)
+  promptVersion  String?
+  userId         String   @db.Uuid
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, id])
   @@index([userId])
+  @@index([userId, createdAt])
   @@map("llm_usage")
 }
 
@@ -302,4 +310,3 @@ model AuditLog {
   @@index([userId])
   @@map("audit_logs")
 }
-

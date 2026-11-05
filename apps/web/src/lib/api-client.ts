@@ -1,3 +1,4 @@
+import { importProposalSchema, usageSummarySchema } from '@jobpilot/shared/llm';
 import { z } from 'zod';
 import {
   loginSchema,
@@ -73,10 +74,14 @@ export function createApiClient(fetcher: typeof fetch = fetch) {
       send(path, {
         method,
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type':
+            payload instanceof Blob ? 'application/pdf' : 'application/json',
           'X-CSRF-Token': await getCsrf(),
         },
-        body: JSON.stringify(payload),
+        body: payload instanceof Blob ? payload : JSON.stringify(payload),
+        signal: AbortSignal.timeout(
+          path.startsWith('/resumes') ? 210000 : 15000,
+        ),
       });
     try {
       return await perform();
@@ -89,6 +94,13 @@ export function createApiClient(fetcher: typeof fetch = fetch) {
     }
   }
   return {
+    importResume: async (file: File) =>
+      importProposalSchema.parse(await write('/resumes/import', file)),
+    reindexResume: async (id: string) =>
+      resumeRecordSchema.parse(
+        await write('/resumes/' + id + '/embedding', {}),
+      ),
+    llmUsage: async () => usageSummarySchema.parse(await send('/llm/usage')),
     resumes: async () =>
       z.array(resumeRecordSchema).parse(await send('/resumes')),
     saveResume: async (id: string | undefined, value: ResumeInput) =>

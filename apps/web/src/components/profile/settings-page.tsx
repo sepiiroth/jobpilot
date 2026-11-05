@@ -13,6 +13,7 @@ import {
   type CompanyRecord,
   type SecretKind,
 } from '@jobpilot/shared/profile';
+import { LlmUsage } from './llm-usage';
 import { apiClient } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,6 +48,7 @@ export function SettingsPage() {
       ) : (
         <SettingsEditor value={settings.data} />
       )}
+      <LlmUsage />
       <SecretEditor />
       <CompaniesEditor />
     </section>

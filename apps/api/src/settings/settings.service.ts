@@ -1,3 +1,5 @@
+import type { LlmEnvironment } from '@jobpilot/llm/config';
+import { ResumeEmbeddings } from '../resumes/resume-embeddings.ts';
 import {
   companyInputSchema,
   companyRecordSchema,
@@ -14,24 +16,37 @@ export class SettingsService {
   constructor(
     private readonly repository: SettingsRepository,
     private readonly crypto: CryptoService,
+    private readonly embeddings: ResumeEmbeddings,
+    private readonly defaults: Pick<
+      LlmEnvironment,
+      'DEFAULT_LLM_PROVIDER' | 'OLLAMA_BASE_URL'
+    >,
   ) {}
   async get(userId: string) {
     const value = await this.repository.settings(userId);
     return profileSettingsSchema.parse(
       value ?? {
-        llmProvider: 'anthropic',
+        llmProvider: this.defaults.DEFAULT_LLM_PROVIDER,
         generationModel: 'claude-sonnet-5-5',
         scoringModel: 'claude-haiku-5-5',
         embeddingProvider: 'openai',
         embeddingModel: 'text-embedding-3-small',
-        ollamaBaseUrl: 'http://localhost:11434',
+        ollamaBaseUrl: this.defaults.OLLAMA_BASE_URL,
         imap: null,
       },
     );
   }
   async save(userId: string, input: unknown) {
     const value = profileSettingsSchema.parse(input);
+    const previous = await this.get(userId);
     await this.repository.saveSettings(userId, value);
+    if (
+      previous.embeddingProvider !== value.embeddingProvider ||
+      previous.embeddingModel !== value.embeddingModel ||
+      previous.ollamaBaseUrl !== value.ollamaBaseUrl
+    )
+      await this.embeddings.invalidate(userId);
+    this.embeddings.schedule(userId);
     return value;
   }
   async secrets(userId: string): Promise<SecretStatus[]> {
@@ -67,10 +82,12 @@ export class SettingsService {
       kind,
       this.crypto.encrypt(value, `${userId}:${kind}`),
     );
+    if (kind.startsWith('embedding_')) this.embeddings.schedule(userId);
     return { kind, configured: true, lastFour: value.slice(-4) };
   }
   async deleteSecret(userId: string, kind: SecretKind) {
     await this.repository.deleteSecret(userId, kind);
+    if (kind.startsWith('embedding_')) await this.embeddings.invalidate(userId);
     return { kind, configured: false, lastFour: null };
   }
   async companies(userId: string) {

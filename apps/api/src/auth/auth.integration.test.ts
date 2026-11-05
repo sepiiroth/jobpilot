@@ -1,3 +1,15 @@
+import type { z } from 'zod';
+import {
+  LlmService,
+  LlmRepository,
+  LlmError,
+  llmEnvironmentSchema,
+  type ProviderConfiguration,
+  type LlmProvider,
+  type Prompt,
+} from '@jobpilot/llm';
+import { syntheticResume } from '../resumes/__fixtures__/resume.ts';
+import { renderResumePdf } from '../resumes/resume-pdf.ts';
 import { beforeAll, beforeEach, afterAll, it, expect } from 'vitest';
 import {
   GenericContainer,
@@ -10,7 +22,7 @@ import request from 'supertest';
 import { Redis } from 'ioredis';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Server } from 'node:http';
-import { createDatabaseClient, type PrismaClient } from '@jobpilot/db';
+import { Prisma, createDatabaseClient, type PrismaClient } from '@jobpilot/db';
 import { createApplication } from '../application.ts';
 import { Passwords } from './passwords.ts';
 import { expectOwnershipIsolation } from '../testing/idor.ts';
@@ -23,6 +35,34 @@ let postgres: StartedTestContainer | undefined,
 let email: string, password: string, userId: string, otherId: string;
 let databaseUrl = '';
 let logs = '';
+const llmSelections: ProviderConfiguration[] = [];
+const llmFactory = (selected: ProviderConfiguration): LlmProvider => {
+  llmSelections.push({ ...selected, apiKey: 'redacted' });
+  return {
+    async generateStructured<T>(_prompt: Prompt, schema: z.ZodType<T>) {
+      if (selected.model === 'test-invalid')
+        throw new LlmError('LLM_INVALID_OUTPUT');
+      return {
+        value: schema.parse({ data: syntheticResume, warnings: [] }) as T,
+        usage: { tokensIn: 40, tokensOut: 20 },
+      };
+    },
+    async generateText() {
+      return {
+        value: 'Synthetic text',
+        usage: { tokensIn: 20, tokensOut: 10 },
+      };
+    },
+    async embed() {
+      if (selected.model === 'test-failed')
+        throw new LlmError('LLM_UNAVAILABLE');
+      return {
+        value: [1, ...Array<number>(1023).fill(0)],
+        usage: { tokensIn: 10, tokensOut: 0 },
+      };
+    },
+  };
+};
 const origin = 'https://web.example.invalid';
 const passwords = new Passwords();
 interface Browser {
@@ -100,6 +140,7 @@ beforeAll(async () => {
     {
       db,
       redis,
+      llmFactory,
       logs: {
         write(chunk: string) {
           logs += chunk;
@@ -653,4 +694,277 @@ it('requires authentication, CSRF and valid data on profile routes', async () =>
   await profileWrite(owner, '/settings/secrets/not-a-kind', {
     value: randomBytes(32).toString('hex'),
   }).expect(400);
+});
+
+const localAiSettings = {
+  llmProvider: 'ollama',
+  generationModel: 'test-generation',
+  scoringModel: 'test-scoring',
+  embeddingProvider: 'ollama',
+  embeddingModel: 'test-embedding',
+  ollamaBaseUrl: 'http://localhost:11434',
+  imap: null,
+};
+it('preserves manual resumes without credentials and computes embeddings once configured', async () => {
+  const owner = await browserAs(userId),
+    stranger = await browserAs(otherId);
+  const response = await profileWrite(owner, '/resumes', resumeInput).expect(
+    200,
+  );
+  const id = String(response.body.id);
+  expect(response.body.embeddingStatus).toBe('not_configured');
+  await profileWrite(owner, '/settings', localAiSettings).expect(200);
+  for (let i = 0; i < 50; i++) {
+    const row = await db.resume.findFirstOrThrow({ where: { userId, id } });
+    if (row.embeddingStatus === 'ready') break;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  const record = await db.resume.findFirstOrThrow({ where: { userId, id } });
+  expect(record.embeddingStatus).toBe('ready');
+  expect(record.embeddingProvider).toBe('ollama');
+  const vectors = await db.$queryRaw<
+    Array<{ dimensions: number }>
+  >`SELECT vector_dims(embedding) AS dimensions FROM resumes WHERE id=${id}::uuid`;
+  expect(vectors[0]?.dimensions).toBe(1024);
+  await profileWrite(stranger, `/resumes/${id}/embedding`, {}).expect(404);
+  const updated = await profileWrite(owner, `/resumes/${id}`, {
+    ...resumeInput,
+    title: 'Changed title',
+  }).expect(200);
+  expect(updated.body.embeddingStatus).toBe('ready');
+  await profileWrite(owner, '/settings', {
+    ...localAiSettings,
+    embeddingModel: 'test-failed',
+  }).expect(200);
+  const retry = await profileWrite(
+    owner,
+    `/resumes/${id}/embedding`,
+    {},
+  ).expect(200);
+  expect(retry.body.embeddingStatus).toBe('failed');
+  expect(
+    (await db.resume.findFirstOrThrow({ where: { userId, id } })).title,
+  ).toBe('Changed title');
+  const stale = await db.$queryRaw<
+    Array<{ embedding: string | null }>
+  >`SELECT embedding::text FROM resumes WHERE id=${id}::uuid`;
+  expect(stale[0]?.embedding).toBeNull();
+});
+it('switches text providers through settings and proposes PDF data without saving a master', async () => {
+  const owner = await browserAs(userId);
+  const pdf = await renderResumePdf(syntheticResume);
+  for (const provider of ['anthropic', 'openai', 'mistral', 'ollama']) {
+    await profileWrite(owner, '/settings', {
+      ...localAiSettings,
+      llmProvider: provider,
+    }).expect(200);
+    if (provider !== 'ollama')
+      await profileWrite(owner, '/settings/secrets/llm_' + provider, {
+        value: randomBytes(24).toString('hex'),
+      }).expect(200);
+    const proposal = await request(server)
+      .post('/resumes/import')
+      .set('Cookie', owner.cookie)
+      .set('X-CSRF-Token', owner.csrf)
+      .set('Origin', origin)
+      .set('Content-Type', 'application/pdf')
+      .send(pdf)
+      .expect(200);
+    expect(proposal.body.data.basics.name).toBe(syntheticResume.basics.name);
+    expect(llmSelections.at(-1)?.provider).toBe(provider);
+  }
+  expect(await db.resume.count({ where: { userId } })).toBe(0);
+  const usage = await request(server)
+    .get('/llm/usage')
+    .set('Cookie', owner.cookie)
+    .expect(200);
+  expect(usage.body.tokensUsed).toBe(240);
+  expect(usage.body.tokensReserved).toBe(0);
+  expect(usage.body.unpricedCalls).toBe(4);
+  const stranger = await browserAs(otherId);
+  expect(
+    (
+      await request(server)
+        .get('/llm/usage')
+        .set('Cookie', stranger.cookie)
+        .expect(200)
+    ).body.tokensUsed,
+  ).toBe(0);
+});
+it('rejects invalid model output and unsafe PDF uploads without creating resumes', async () => {
+  const owner = await browserAs(userId);
+  await profileWrite(owner, '/settings', {
+    ...localAiSettings,
+    generationModel: 'test-invalid',
+  }).expect(200);
+  const post = (buffer: Buffer, type = 'application/pdf') =>
+    request(server)
+      .post('/resumes/import')
+      .set('Cookie', owner.cookie)
+      .set('X-CSRF-Token', owner.csrf)
+      .set('Content-Type', type)
+      .send(buffer);
+  const invalid = await post(await renderResumePdf(syntheticResume)).expect(
+    422,
+  );
+  expect(invalid.body.error.code).toBe('LLM_INVALID_OUTPUT');
+  await post(Buffer.from('not a PDF')).expect(415);
+  await post(Buffer.from('%PDF-invalid')).expect(422);
+  await post(Buffer.alloc(5 * 1024 * 1024 + 1)).expect(413);
+  await post(Buffer.from('invalid'), 'application/octet-stream').expect(415);
+  await request(server)
+    .post('/resumes/import')
+    .set('Cookie', owner.cookie)
+    .set('Content-Type', 'application/pdf')
+    .send(await renderResumePdf(syntheticResume))
+    .expect(403);
+  expect(await db.resume.count({ where: { userId } })).toBe(0);
+});
+it('reserves monthly usage atomically and independently for each user', async () => {
+  const repository = new LlmRepository(db);
+  const input = {
+    purpose: 'test',
+    provider: 'ollama',
+    model: 'test-model',
+    tokens: 15,
+    promptVersion: null,
+  };
+  const results = await Promise.allSettled([
+    repository.reserve(userId, input, 20),
+    repository.reserve(userId, input, 20),
+  ]);
+  expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+  expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1);
+  await expect(repository.reserve(otherId, input, 20)).resolves.toBeDefined();
+  const summary = await repository.summary(userId, 20);
+  expect(summary.tokensReserved).toBe(15);
+});
+it('bounds retries and retains uncertain usage after a timeout', async () => {
+  await db.userSettings.create({
+    data: { userId, ...localAiSettings, imap: Prisma.DbNull },
+  });
+  const { CryptoService } = await import('../crypto/crypto.service.ts');
+  const crypto = new CryptoService({
+    ENCRYPTION_KEY: randomBytes(32).toString('base64'),
+    ENCRYPTION_KEY_VERSION: 1,
+    ENCRYPTION_PREVIOUS_KEYS: {},
+  });
+  let attempts = 0;
+  const never: LlmProvider = {
+    async generateStructured() {
+      throw new Error('unused');
+    },
+    async generateText() {
+      attempts++;
+      return new Promise(() => {});
+    },
+    async embed() {
+      throw new Error('unused');
+    },
+  };
+  const service = new LlmService(
+    new LlmRepository(db),
+    crypto,
+    llmEnvironmentSchema.parse({ LLM_TIMEOUT_MS: 100, LLM_MAX_RETRIES: 1 }),
+    () => never,
+  );
+  await expect(
+    service.generateText(userId, 'timeout-test', {
+      version: 'test',
+      system: 'Task',
+      user: 'Synthetic input',
+    }),
+  ).rejects.toMatchObject({ code: 'LLM_TIMEOUT' });
+  expect(attempts).toBe(2);
+  expect((await service.summary(userId)).tokensReserved).toBeGreaterThan(0);
+  expect(await db.llmUsage.count({ where: { userId, status: 'failed' } })).toBe(
+    2,
+  );
+});
+
+it('does not overwrite a newer resume embedding with a late result', async () => {
+  const { ResumeEmbeddings } = await import('../resumes/resume-embeddings.ts');
+  const { CryptoService } = await import('../crypto/crypto.service.ts');
+  await db.userSettings.create({
+    data: { userId, ...localAiSettings, imap: Prisma.DbNull },
+  });
+  const resume = await db.resume.create({
+    data: { userId, title: 'Concurrent CV', data: syntheticResume },
+  });
+  const crypto = new CryptoService({
+    ENCRYPTION_KEY: randomBytes(32).toString('base64'),
+    ENCRYPTION_KEY_VERSION: 1,
+    ENCRYPTION_PREVIOUS_KEYS: {},
+  });
+  let release: (() => void) | undefined;
+  let started: (() => void) | undefined;
+  const ready = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const factory = (selected: ProviderConfiguration): LlmProvider => ({
+    ...llmFactory(selected),
+    async embed() {
+      started?.();
+      await gate;
+      return {
+        value: [1, ...Array<number>(1023).fill(0)],
+        usage: { tokensIn: 10, tokensOut: 0 },
+      };
+    },
+  });
+  const slow = new ResumeEmbeddings(
+    db,
+    new LlmService(
+      new LlmRepository(db),
+      crypto,
+      llmEnvironmentSchema.parse({}),
+      factory,
+    ),
+  );
+  const first = slow.refresh(userId, resume.id);
+  await ready;
+  await db.resume.update({
+    where: { id: resume.id },
+    data: {
+      revision: { increment: 1 },
+      data: {
+        ...syntheticResume,
+        basics: {
+          ...syntheticResume.basics,
+          summary: 'Updated manual content',
+        },
+      },
+    },
+  });
+  const fastFactory = (selected: ProviderConfiguration): LlmProvider => ({
+    ...llmFactory(selected),
+    async embed() {
+      return {
+        value: [0, 1, ...Array<number>(1022).fill(0)],
+        usage: { tokensIn: 10, tokensOut: 0 },
+      };
+    },
+  });
+  await new ResumeEmbeddings(
+    db,
+    new LlmService(
+      new LlmRepository(db),
+      crypto,
+      llmEnvironmentSchema.parse({}),
+      fastFactory,
+    ),
+  ).refresh(userId, resume.id);
+  release?.();
+  await first;
+  const rows = await db.$queryRaw<
+    Array<{ embedding: string }>
+  >`SELECT embedding::text FROM resumes WHERE id=${resume.id}::uuid`;
+  expect(JSON.parse(rows[0]?.embedding ?? '[]')).toEqual([
+    0,
+    1,
+    ...Array<number>(1022).fill(0),
+  ]);
 });

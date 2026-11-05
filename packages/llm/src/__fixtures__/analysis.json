@@ -1,0 +1,10 @@
+{
+  "score": 42,
+  "strengths": ["TypeScript", "Testing", "Documentation"],
+  "concerns": [
+    "Location unspecified",
+    "Salary unspecified",
+    "Contract unspecified"
+  ],
+  "missingSkills": []
+}

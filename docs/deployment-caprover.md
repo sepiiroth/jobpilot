@@ -200,3 +200,9 @@ For build failures, read the failing CI step before retrying. For pull failures,
 Official references: [CapRover deployment action](https://github.com/caprover/deploy-from-github), [Docker Actions](https://docs.docker.com/build/ci/github-actions/), [pnpm production deploy](https://pnpm.io/10.x/cli/deploy), [PostgreSQL image data layout](https://hub.docker.com/_/postgres).
 
 Production stages use Node.js 24.22.1 on Debian 13 (trixie-slim). The build stages retain bookworm-slim for reusable tooling layers; no build-stage operating-system files are copied into runtime images. The runtime base was selected after the critical-vulnerability scan flagged the older Debian zlib package.
+
+## AI settings and request deadlines
+
+Phase 6 adds the optional AI quota, timeout, pricing and trusted Ollama origins described in [the LLM deployment guide](llm-and-resume-import.md). Configure the same encryption key versions and quota settings on API and worker. Keep only your trusted Ollama origin in the administrator allowlist when using a remote or internal instance.
+
+PDF import and synchronous resume embeddings can outlast a standard short proxy timeout. In the API app's custom Nginx configuration, set `proxy_read_timeout 90s;` and `proxy_send_timeout 90s;` in the appropriate server/location context for the default AI limits. Adjust the proxy and browser timeout together if increasing the AI deadlines or retries. No credentials belong in Nginx configuration.

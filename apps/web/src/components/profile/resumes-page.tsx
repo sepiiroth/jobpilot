@@ -24,6 +24,7 @@ import {
   downloadBlob,
   previewPdf,
 } from './form-parts';
+import { ResumeImport } from './resume-import';
 import { ResumePreview } from './resume-preview';
 const empty = (): ResumeInput => ({
   title: '',
@@ -46,7 +47,17 @@ function cleanDraft(value: ResumeInput) {
 }
 export function ResumesPage() {
   const t = useTranslations('Profile');
-  const query = useQuery({ queryKey: ['resumes'], queryFn: apiClient.resumes });
+  const ai = useTranslations('AI');
+  const [draft, setDraft] = useState<ResumeInput | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [draftVersion, setDraftVersion] = useState(0);
+  const query = useQuery({
+    queryKey: ['resumes'],
+    queryFn: apiClient.resumes,
+    staleTime: 0,
+    refetchInterval: (q) =>
+      q.state.data?.some((v) => v.embeddingStatus === 'pending') ? 3000 : false,
+  });
   const [selected, setSelected] = useState<ResumeRecord | null | undefined>(
     undefined,
   );
@@ -56,8 +67,35 @@ export function ResumesPage() {
         title={t('resumesTitle')}
         description={t('resumesDescription')}
       >
-        <Button onClick={() => setSelected(null)}>{t('newResume')}</Button>
+        <Button
+          onClick={() => {
+            setDraft(null);
+            setWarnings([]);
+            setDraftVersion((v) => v + 1);
+            setSelected(null);
+          }}
+        >
+          {t('newResume')}
+        </Button>
       </ProfileHeader>
+      <ResumeImport
+        onProposal={(proposal, title) => {
+          setDraft({ title, data: proposal.data, isArchived: false });
+          setWarnings(proposal.warnings);
+          setDraftVersion((v) => v + 1);
+          setSelected(null);
+        }}
+      />
+      {draft && selected === null && (
+        <aside className="profile-notice">
+          <p>{ai('reviewNotice')}</p>
+          <ul>
+            {warnings.map((warning, i) => (
+              <li key={i}>{warning}</li>
+            ))}
+          </ul>
+        </aside>
+      )}
       {query.isPending ? (
         <p role="status">{t('loading')}</p>
       ) : query.isError ? (
@@ -84,9 +122,18 @@ export function ResumesPage() {
       )}
       {selected !== undefined && (
         <ResumeEditor
-          key={selected?.id ?? 'new'}
-          record={selected}
-          onSaved={setSelected}
+          key={selected?.id ?? 'draft-' + draftVersion}
+          record={
+            selected
+              ? (query.data?.find((v) => v.id === selected.id) ?? selected)
+              : null
+          }
+          initial={selected ? null : draft}
+          onSaved={(value) => {
+            setDraft(null);
+            setWarnings([]);
+            setSelected(value);
+          }}
           onDeleted={() => setSelected(undefined)}
         />
       )}
@@ -95,14 +142,18 @@ export function ResumesPage() {
 }
 function ResumeEditor({
   record,
+  initial,
   onSaved,
   onDeleted,
 }: {
   record: ResumeRecord | null;
+  initial: ResumeInput | null;
   onSaved: (v: ResumeRecord) => void;
   onDeleted: () => void;
 }) {
   const t = useTranslations('Profile');
+  const ai = useTranslations('AI');
+  const [reviewed, setReviewed] = useState(false);
   const client = useQueryClient();
   const errorMessage = useProfileMessage();
   const form = useForm<ResumeInput>({
@@ -112,7 +163,7 @@ function ResumeEditor({
           data: record.data,
           isArchived: record.isArchived,
         }
-      : empty(),
+      : (initial ?? empty()),
   });
   const work = useFieldArray({ control: form.control, name: 'data.work' });
   const education = useFieldArray({
@@ -410,7 +461,20 @@ function ResumeEditor({
               {t('addLink')}
             </Button>
           </fieldset>
-          <Button type="submit" disabled={mutation.isPending}>
+          {initial && (
+            <label className="profile-check">
+              <input
+                type="checkbox"
+                checked={reviewed}
+                onChange={(e) => setReviewed(e.target.checked)}
+              />
+              {ai('reviewed')}
+            </label>
+          )}
+          <Button
+            type="submit"
+            disabled={mutation.isPending || (!!initial && !reviewed)}
+          >
             {t(mutation.isPending ? 'saving' : 'save')}
           </Button>
         </form>
@@ -451,6 +515,24 @@ function ResumeEditor({
             }}
           >
             {t('viewPdf')}
+          </Button>
+          <p role="status">{ai('embedding_' + record.embeddingStatus)}</p>
+          <Button
+            variant="outline"
+            disabled={downloading || mutation.isPending}
+            onClick={async () => {
+              setDownloading(true);
+              try {
+                onSaved(await apiClient.reindexResume(record.id));
+                await client.invalidateQueries({ queryKey: ['resumes'] });
+              } catch (error) {
+                setMessage(errorMessage(error));
+              } finally {
+                setDownloading(false);
+              }
+            }}
+          >
+            {ai('retryEmbedding')}
           </Button>
           <DeleteButton
             onDelete={async () => {

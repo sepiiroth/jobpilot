@@ -20,7 +20,14 @@ export class ResumesRepository {
     return this.db.$transaction(async (tx) => {
       const result = await tx.resume.updateMany({
         where: { userId, id },
-        data: { ...input, data: input.data as Prisma.InputJsonValue },
+        data: {
+          ...input,
+          data: input.data as Prisma.InputJsonValue,
+          revision: { increment: 1 },
+          embeddingStatus: 'pending',
+          embeddingProvider: null,
+          embeddingModel: null,
+        },
       });
       if (!result.count) return null;
       // Stored vectors must never survive an edit to their source text.

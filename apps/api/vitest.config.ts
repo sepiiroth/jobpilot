@@ -4,7 +4,12 @@ export default defineConfig({
     fileParallelism: false,
     coverage: {
       provider: 'v8',
-      include: ['src/auth/**/*.ts', 'src/crypto/**/*.ts'],
+      include: [
+        'src/auth/**/*.ts',
+        'src/crypto/**/*.ts',
+        '../../packages/shared/src/crypto.ts',
+      ],
+      allowExternal: true,
       exclude: ['src/**/*.test.ts'],
       thresholds: { lines: 80, statements: 80, functions: 80, branches: 80 },
     },

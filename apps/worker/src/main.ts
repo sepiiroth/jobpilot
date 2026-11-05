@@ -1,27 +1,37 @@
 import 'reflect-metadata';
+import { LlmModule, llmEnvironmentSchema } from '@jobpilot/llm';
+import {
+  CryptoService,
+  cryptoEnvironmentSchema,
+} from '@jobpilot/shared/crypto';
 import { Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { createServer } from 'node:http';
 import { Redis } from 'ioredis';
 import { z } from 'zod';
 import { createDatabaseClient } from '@jobpilot/db';
-const schema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']),
-  DATABASE_URL: z
-    .url()
-    .refine((v) => ['postgres:', 'postgresql:'].includes(new URL(v).protocol)),
-  VALKEY_URL: z
-    .url()
-    .refine((v) => ['redis:', 'rediss:'].includes(new URL(v).protocol)),
-  ENCRYPTION_KEY: z
-    .string()
-    .refine(
-      (v) =>
-        Buffer.from(v, 'base64').length === 32 &&
-        Buffer.from(v, 'base64').toString('base64') === v,
-    ),
-  WORKER_HEALTH_PORT: z.coerce.number().int().min(1).max(65535).default(3002),
-});
+const schema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'test', 'production']),
+    DATABASE_URL: z
+      .url()
+      .refine((v) =>
+        ['postgres:', 'postgresql:'].includes(new URL(v).protocol),
+      ),
+    VALKEY_URL: z
+      .url()
+      .refine((v) => ['redis:', 'rediss:'].includes(new URL(v).protocol)),
+    ENCRYPTION_KEY: z
+      .string()
+      .refine(
+        (v) =>
+          Buffer.from(v, 'base64').length === 32 &&
+          Buffer.from(v, 'base64').toString('base64') === v,
+      ),
+    WORKER_HEALTH_PORT: z.coerce.number().int().min(1).max(65535).default(3002),
+  })
+  .extend(llmEnvironmentSchema.shape)
+  .extend(cryptoEnvironmentSchema.shape);
 try {
   const parsed = schema.safeParse(process.env);
   if (!parsed.success)
@@ -66,6 +76,7 @@ try {
   });
   class WorkerModule {}
   Module({
+    imports: [LlmModule.forRoot(db, new CryptoService(config), process.env)],
     providers: [
       {
         provide: 'WORKER_RESOURCES',

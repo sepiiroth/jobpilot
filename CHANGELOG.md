@@ -29,3 +29,8 @@
 - Add phase 5 resume and search CRUD with authenticated ownership checks and section-based French forms.
 - Add encrypted write-only credentials, provider preferences, ATS companies and stored IMAP configuration.
 - Export master resumes as selectable single-column PDFs and verify text extraction and multi-page output.
+
+- Add phase 6 provider-agnostic AI SDK module for API and worker with versioned untrusted-data prompts.
+- Meter calls with atomic monthly token reservations, bounded retries and optional cost rates.
+- Import PDFs into editable review drafts without changing master resumes.
+- Calculate resume embeddings on save, preserve data on failure and invalidate stale vectors after settings changes.

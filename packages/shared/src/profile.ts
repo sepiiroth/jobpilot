@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { embeddingStateSchema } from './llm.ts';
 import { resumeSchema, searchSchema, settingsSchema } from './index.ts';
 
 export const resumeInputSchema = z.strictObject({
@@ -7,7 +8,10 @@ export const resumeInputSchema = z.strictObject({
   isArchived: z.boolean().default(false),
 });
 export const resumeRecordSchema = resumeInputSchema
-  .extend({ id: z.uuid() })
+  .extend({
+    id: z.uuid(),
+    embeddingStatus: embeddingStateSchema.default('pending'),
+  })
   .strip();
 export const searchInputSchema = searchSchema.omit({ sources: true }).extend({
   sources: z
