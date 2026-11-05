@@ -30,6 +30,9 @@ model User {
   offerEmbedding    OfferEmbedding[]
   scoringTask       ScoringTask[]
   searchMatch       SearchMatch[]
+  emailMailbox      EmailMailbox[]
+  emailMessage      EmailMessage[]
+  privateOffers     JobOffer[]          @relation("PrivateJobOffers")
 
   @@map("users")
 }
@@ -156,7 +159,9 @@ model TrackedCompany {
 }
 
 model JobOffer {
-  applications Application[] @relation("Application_jobOffer")
+  privateUserId String?       @db.Uuid
+  privateUser   User?         @relation("PrivateJobOffers", fields: [privateUserId], references: [id], onDelete: Cascade)
+  applications  Application[] @relation("Application_jobOffer")
 
   documents GeneratedDocument[] @relation("GeneratedDocument_jobOffer")
 
@@ -189,6 +194,7 @@ model JobOffer {
 
   @@unique([sourceId, externalId])
   @@index([dedupKey, fetchedAt])
+  @@index([privateUserId])
   @@map("job_offers")
 }
 
@@ -433,4 +439,34 @@ model SearchMatch {
   @@unique([userId, searchId, jobOfferId])
   @@index([userId, passed, llmScore])
   @@map("search_matches")
+}
+
+model EmailMailbox {
+  id          String @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId      String @db.Uuid
+  accountKey  String
+  uidValidity String
+  lastUid     String @default("0")
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, accountKey, uidValidity])
+  @@map("email_mailboxes")
+}
+
+model EmailMessage {
+  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  createdAt   DateTime @default(now()) @db.Timestamptz
+  userId      String   @db.Uuid
+  accountKey  String
+  uidValidity String
+  uid         String
+  status      String
+  senderKey   String?
+  errorCode   String?
+  offers      Json     @default("[]") @db.JsonB
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, accountKey, uidValidity, uid])
+  @@index([userId, accountKey, uidValidity, createdAt])
+  @@map("email_messages")
 }

@@ -20,3 +20,4 @@ export {
 
 export { scoringKey, resultKey } from './scoring-key.ts';
 export { MatchingRepository } from './matching-repository.ts';
+export { EmailRepository, emailAccountKey } from './email-repository.ts';

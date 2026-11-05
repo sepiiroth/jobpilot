@@ -43,3 +43,8 @@
 - Persist scoring attempt budgets across retries and fence stale results after profile edits.
 - Add French offers filters, detailed analyses, interesting/ignored actions and dashboard summaries.
 - Verify durable ignored states, tenant ownership, call limits and matching coverage thresholds.
+
+- Add phase 9 read-only IMAP alerts with verified TLS, pinned DNS addresses and exact sender allowlists.
+- Extract grounded vacancies through the configured small model with bounded MIME input and no automatic UID reprocessing.
+- Keep email-derived offers private, preserve ignored states and include email state in account export/deletion.
+- Validate real IMAP flags, certificate checks and the BullMQ pipeline with temporary Dovecot and Mailpit services.

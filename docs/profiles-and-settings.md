@@ -32,7 +32,7 @@ Searches may be active or inactive. Sources are stored as preferences; selecting
 
 Open **Paramètres** to select generation/scoring and embedding providers, exact model identifiers, and the Ollama endpoint. The privacy notice explains external processing and local Ollama. Saving embedding preferences can start recalculation of saved CV embeddings; see the LLM guide for quota and privacy details.
 
-For IMAP, save the server hostname, TLS port, username, mailbox and authorized sender addresses. Store its password separately under **Clés et mots de passe**. There is no mailbox connection in this phase. The future IMAP connector must enforce TLS, read-only access and hostname/network validation before connecting; a saved hostname is not authorization to bypass those checks.
+For IMAP, save the server hostname, TLS port, username, mailbox and authorized sender addresses. Store its password separately under **Clés et mots de passe**. This settings screen does not connect to the mailbox. The [phase 9 IMAP connector](email-alerts.md) reads it during collection with TLS, read-only access and hostname/network validation; a saved hostname does not bypass those checks.
 
 Credential inputs are masked and initially empty. Saving a replacement encrypts it using AES-256-GCM with a unique IV, authenticated context `userId:kind` and the current key version. Leaving an input empty preserves the existing value. Explicit deletion removes it. Responses expose only the credential kind, `configured` and `lastFour`; no plaintext value or encrypted material is sent to the browser. Full account export omits all credential values as well.
 

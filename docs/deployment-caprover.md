@@ -210,3 +210,7 @@ PDF import and synchronous resume embeddings can outlast a standard short proxy 
 ## Phase 8: scoring deployment
 
 Configure SCORING_LLM_TOP_N in the worker (default 30, range 0–100). Apply the updated API before the worker so migration 20261105210000_job_scoring exists before queue recovery. The release workflow submits apps in API → worker → web order; review API migration logs and health before proceeding with a manual deployment. The worker never runs migrations. See [scoring and offers](scoring-and-offers.md) for private vectors, durable attempt budgets and verification.
+
+## Phase 9: email alerts
+
+The worker now consumes IMAP alerts during collection. Configure the encrypted mailbox password and authorized senders in Settings. Keep `ALLOW_PRIVATE_IMAP_HOST=false` unless an internal mailbox is explicitly intended; TLS validation stays mandatory. Apply API migration `20261105223000_email_alerts` before deploying the worker. Configure the optional sender restriction and bounds described in [email alerts](email-alerts.md). Dovecot is a disposable test dependency, not an additional production service.

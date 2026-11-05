@@ -7,13 +7,17 @@ export interface RawJobOffer {
   country: string;
 }
 export interface SourceContext {
+  email?: {
+    configured: boolean;
+    read: () => Promise<{ offers: NormalizedJobOffer[]; warning?: string }>;
+  };
   companies: Array<{ name: string; atsType: string; atsToken: string }>;
   credentials: Record<string, string>;
   maxPages: number;
   get: (url: URL, source: string) => Promise<unknown>;
 }
 export interface JobSource {
-  readonly id: 'adzuna' | 'greenhouse' | 'lever' | 'ashby';
+  readonly id: 'adzuna' | 'greenhouse' | 'lever' | 'ashby' | 'email';
   readonly displayName: string;
   readonly requestsPerSecond: number;
   isConfigured(ctx: SourceContext): boolean;

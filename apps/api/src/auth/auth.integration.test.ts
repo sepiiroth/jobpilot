@@ -1,3 +1,4 @@
+import { EmailRepository, emailAccountKey } from '@jobpilot/db';
 import { ScoringPipeline } from '../../../worker/src/matching/scoring.ts';
 import {
   CollectionRepository,
@@ -1479,4 +1480,186 @@ it('keeps the scoring lease alive during a slow provider call', async () => {
       await db.collectionRun.findUniqueOrThrow({ where: { id: run.id } })
     ).heartbeatAt!.getTime(),
   ).toBeGreaterThan(initial!.getTime());
+});
+it('persists UID processing once per owned mailbox and separates email offers from public offers', async () => {
+  const fixture = await scoringFixture({ vectors: false }),
+    collections = new CollectionRepository(db);
+  const run = await db.collectionRun.update({
+    where: { id: fixture.run.id },
+    data: { stage: 'collection', status: 'queued', workerToken: null },
+  });
+  const token = await collections.claim(userId, run.id),
+    step = await db.collectionStep.findFirstOrThrow({
+      where: { runId: run.id, userId },
+    });
+  const publicOffer = fixture.offers[0]!;
+  const raw = normalizedJobOfferSchema.parse({
+    ...publicOffer,
+    sourceId: 'email',
+    externalId: userId + ':email-test',
+    salaryMin: null,
+    salaryMax: null,
+    publishedAt: null,
+    fetchedAt: new Date().toISOString(),
+  });
+  await db.userJobMatch.updateMany({
+    where: { userId, jobOfferId: publicOffer.id },
+    data: { status: 'ignored' },
+  });
+  const privateId = await collections.store(
+    userId,
+    run.id,
+    step.id,
+    token!,
+    raw,
+  );
+  expect(privateId).not.toBe(publicOffer.id);
+  expect(
+    (await db.jobOffer.findUniqueOrThrow({ where: { id: privateId! } }))
+      .privateUserId,
+  ).toBe(userId);
+  expect(
+    (
+      await db.userJobMatch.findUniqueOrThrow({
+        where: { userId_jobOfferId: { userId, jobOfferId: privateId! } },
+      })
+    ).status,
+  ).toBe('ignored');
+  const repo = new EmailRepository(db),
+    account = emailAccountKey(
+      'IMAP.example.invalid',
+      993,
+      'synthetic@example.invalid',
+      'INBOX',
+    );
+  expect(account).toBe(
+    emailAccountKey(
+      'imap.example.invalid',
+      993,
+      'synthetic@example.invalid',
+      'INBOX',
+    ),
+  );
+  const mailbox = await repo.mailbox(userId, account, '1');
+  const claims = await Promise.all([
+    repo.claim(
+      userId,
+      account,
+      '1',
+      '4294967295',
+      'processing',
+      null,
+      'sender-hash',
+    ),
+    repo.claim(
+      userId,
+      account,
+      '1',
+      '4294967295',
+      'processing',
+      null,
+      'sender-hash',
+    ),
+  ]);
+  expect(claims.filter(Boolean)).toHaveLength(1);
+  await repo.finish(userId, account, '1', '4294967295', [raw]);
+  await repo.advance(userId, mailbox.id, 4294967295);
+  await repo.advance(userId, mailbox.id, 1);
+  expect(
+    (await db.emailMailbox.findUniqueOrThrow({ where: { id: mailbox.id } }))
+      .lastUid,
+  ).toBe('4294967295');
+  expect(
+    (await repo.cached(userId, account, '1', 10, ['sender-hash'])).offers,
+  ).toHaveLength(1);
+  expect(
+    (await repo.cached(userId, account, '1', 10, ['other-sender'])).offers,
+  ).toHaveLength(0);
+  expect(
+    (await repo.cached(otherId, account, '1', 10, ['sender-hash'])).offers,
+  ).toHaveLength(0);
+  expect(
+    await repo.claim(
+      userId,
+      account,
+      '2',
+      '4294967295',
+      'processing',
+      null,
+      'sender-hash',
+    ),
+  ).toBe(true);
+  await repo.finish(
+    userId,
+    account,
+    '2',
+    '4294967295',
+    null,
+    'EMAIL_EXTRACTION_FAILED',
+  );
+  expect(
+    (await repo.cached(userId, account, '2', 10, ['sender-hash'])).uncertain,
+  ).toBe(true);
+  const owner = await browserAs(userId),
+    stranger = await browserAs(otherId),
+    secret = randomBytes(24).toString('hex');
+  const correspondence = await db.searchMatch.create({
+    data: {
+      userId,
+      searchId: step.searchId,
+      jobOfferId: privateId!,
+      runId: run.id,
+      inputKey: 'synthetic-private-match',
+      passed: true,
+      notes: [],
+      state: 'waiting',
+    },
+  });
+  await profileWrite(owner, '/jobs/' + correspondence.id + '/status', {
+    status: 'new',
+  }).expect(200);
+  expect(
+    (
+      await db.userJobMatch.findUniqueOrThrow({
+        where: { userId_jobOfferId: { userId, jobOfferId: publicOffer.id } },
+      })
+    ).status,
+  ).toBe('new');
+  await profileWrite(owner, '/jobs/' + correspondence.id + '/status', {
+    status: 'ignored',
+  }).expect(200);
+  expect(
+    (
+      await db.userJobMatch.findUniqueOrThrow({
+        where: { userId_jobOfferId: { userId, jobOfferId: publicOffer.id } },
+      })
+    ).status,
+  ).toBe('ignored');
+  const saved = await profileWrite(owner, '/settings/secrets/imap', {
+    value: secret,
+  }).expect(200);
+  expect(JSON.stringify(saved.body)).not.toContain(secret);
+  const stored = await db.userSecret.findUniqueOrThrow({
+    where: { userId_kind: { userId, kind: 'imap' } },
+  });
+  expect(Buffer.from(stored.ciphertext).includes(Buffer.from(secret))).toBe(
+    false,
+  );
+  const foreign = await request(server)
+    .get('/settings/secrets/imap')
+    .set('Cookie', stranger.cookie)
+    .expect(200);
+  expect(foreign.body.configured).toBe(false);
+  const exported = await request(server)
+    .get('/users/me/export')
+    .set('Cookie', owner.cookie)
+    .expect(200);
+  expect(exported.body.emailMessages).toHaveLength(2);
+  expect(exported.body.emailMailboxes).toHaveLength(1);
+  expect(JSON.stringify(exported.body)).not.toContain(secret);
+  await db.user.delete({ where: { id: userId } });
+  expect(await db.emailMessage.count({ where: { userId } })).toBe(0);
+  expect(await db.emailMailbox.count({ where: { userId } })).toBe(0);
+  expect(await db.jobOffer.count({ where: { id: privateId! } })).toBe(0);
+  expect(await db.jobOffer.count({ where: { id: publicOffer.id } })).toBe(1);
 });

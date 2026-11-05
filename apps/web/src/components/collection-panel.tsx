@@ -15,6 +15,29 @@ const reportSources = new Set([
   'embedding',
   'worker',
 ]);
+function reportError(code: string) {
+  if (code === 'SOURCE_NOT_CONFIGURED') return 'configuration';
+  if (
+    [
+      'COLLECTION_OFFER_LIMIT',
+      'COLLECTION_REQUEST_LIMIT',
+      'COLLECTION_PAGE_LIMIT',
+      'COLLECTION_TIME_LIMIT',
+      'EMAIL_MESSAGE_LIMIT',
+      'EMAIL_CACHE_LIMIT',
+    ].includes(code)
+  )
+    return 'limit';
+  if (code === 'SOURCE_NOT_AVAILABLE') return 'unavailable';
+  if (code.startsWith('SCORING_')) return 'scoring';
+  if (code === 'EMBEDDING_FAILED') return 'embedding';
+  if (code === 'EMAIL_HOST_FORBIDDEN') return 'email_host';
+  if (code === 'EMAIL_MESSAGE_TOO_LARGE') return 'email_size';
+  if (['EMAIL_EXTRACTION_FAILED', 'EMAIL_EXTRACTION_UNCERTAIN'].includes(code))
+    return 'email_extraction';
+  if (code.startsWith('EMAIL_')) return 'email_connection';
+  return 'source';
+}
 export function CollectionPanel() {
   const t = useTranslations('Collection');
   const [id, setId] = useState<string | undefined>();
@@ -113,23 +136,7 @@ export function CollectionPanel() {
                         ? 'source_' + e.source
                         : 'source_other',
                     )}{' '}
-                    :{' '}
-                    {t(
-                      'error_' +
-                        (e.code === 'SOURCE_NOT_CONFIGURED'
-                          ? 'configuration'
-                          : e.code === 'COLLECTION_OFFER_LIMIT' ||
-                              e.code === 'COLLECTION_REQUEST_LIMIT' ||
-                              e.code === 'COLLECTION_PAGE_LIMIT'
-                            ? 'limit'
-                            : e.code === 'SOURCE_NOT_AVAILABLE'
-                              ? 'unavailable'
-                              : e.code.startsWith('SCORING_')
-                                ? 'scoring'
-                                : e.code === 'EMBEDDING_FAILED'
-                                  ? 'embedding'
-                                  : 'source'),
-                    )}
+                    : {t('error_' + reportError(e.code))}
                   </li>
                 ))}
               </ul>

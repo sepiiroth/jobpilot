@@ -1,0 +1,9 @@
+From: Unknown Sender <blocked@example.invalid>
+To: Synthetic Inbox <inbox@example.invalid>
+Subject: Synthetic unauthorized message
+Date: Thu, 05 Nov 2026 09:01:00 +0000
+Message-ID: <synthetic-blocked-1@example.invalid>
+Content-Type: text/plain; charset=UTF-8
+
+This sender is not authorized. Do not send this content to a language model.
+https://jobs.example.invalid/blocked-role

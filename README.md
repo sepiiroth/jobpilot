@@ -1,6 +1,6 @@
 # JobPilot
 
-Self-hosted job search assistant. Includes secure accounts, resumes, searches, AI-assisted PDF import and manual collection from authorized job APIs.
+Self-hosted job search assistant. Includes secure accounts, resumes, searches, AI-assisted PDF import and manual collection from authorized job APIs and personal email alerts.
 
 ## Setup
 
@@ -22,7 +22,7 @@ Hook activation is explicit to respect the project prohibition on assistant Git 
 
 Apps: web, api, worker. Packages: shared, db, llm, sources, config. Frameworks and business logic are added in subsequent phases.
 
-Mailpit UI: http://localhost:8025; SMTP: localhost:1025. Mailpit does not provide IMAP; phase 9 needs a separate IMAP test server or an approved alternative.
+Mailpit UI: http://localhost:8025; SMTP: localhost:1025. IMAP integration tests use a separate disposable Dovecot server alongside Mailpit; see the phase 9 guide.
 
 Only authorized APIs and user-owned email alerts are allowed. Scrapers violating terms of service are prohibited.
 
@@ -69,3 +69,7 @@ See [collection setup and verification](docs/collection.md) for source configura
 ## Phase 8: scoring and offers
 
 See [scoring and offers](docs/scoring-and-offers.md) for the three-stage pipeline, persistent analysis limits, filters, status actions, dashboard summary and verification.
+
+## Phase 9: email alerts
+
+See [read-only email alerts](docs/email-alerts.md) for IMAP setup, authorized senders, private offers, UID tracking, TLS/network policy and verification with temporary Dovecot and Mailpit servers.

@@ -16,3 +16,4 @@ export type {
   LlmResult,
 } from './provider.ts';
 export { jobScoringPrompt } from './prompts/job-scoring-v1.ts';
+export { emailAlertPrompt } from './prompts/email-alert-v1.ts';

@@ -210,12 +210,13 @@ export class CollectionRepository {
         where: { stepId_externalId: { stepId, externalId: offer.externalId } },
       });
       if (seen) return seen.jobOfferId;
+      const privateUserId = offer.sourceId === 'email' ? userId : null;
       const dedupKey = computeDedupKey(
         offer.title,
         offer.company,
         offer.location.city,
       );
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${'offer:' + dedupKey},0))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${'offer:' + (privateUserId ?? 'public') + ':' + dedupKey},0))`;
       const alias = await tx.jobOfferAlias.findUnique({
         where: {
           sourceId_externalId: {
@@ -225,9 +226,12 @@ export class CollectionRepository {
         },
       });
       let existing = alias
-        ? await tx.jobOffer.findUnique({ where: { id: alias.jobOfferId } })
+        ? await tx.jobOffer.findFirst({
+            where: { id: alias.jobOfferId, privateUserId },
+          })
         : await tx.jobOffer.findFirst({
             where: {
+              privateUserId,
               OR: [
                 { sourceId: offer.sourceId, externalId: offer.externalId },
                 {
@@ -238,11 +242,13 @@ export class CollectionRepository {
             },
             orderBy: { id: 'asc' },
           });
+      if (alias && !existing) throw new Error('Source identity collision');
       const contentHash = offerContentHash(offer);
       if (!existing)
         existing = await tx.jobOffer.create({
           data: {
             ...offer,
+            privateUserId,
             location: offer.location as Prisma.InputJsonValue,
             publishedAt: offer.publishedAt ? new Date(offer.publishedAt) : null,
             fetchedAt: new Date(),
@@ -288,12 +294,29 @@ export class CollectionRepository {
         },
         update: {},
       });
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${'offer-status:' + userId + ':' + dedupKey},0))`;
+      const ignored = await tx.userJobMatch.findFirst({
+        where: {
+          userId,
+          status: 'ignored',
+          jobOffer: {
+            OR: [
+              {
+                dedupKey,
+                fetchedAt: { gte: new Date(Date.now() - 30 * 86400000) },
+              },
+              { url: offer.url },
+            ],
+          },
+        },
+      });
       const created = await tx.userJobMatch.createMany({
         data: {
           userId,
           jobOfferId: existing.id,
           searchId: step.searchId,
           hardFilterPassed: false,
+          status: ignored ? 'ignored' : 'new',
         },
         skipDuplicates: true,
       });

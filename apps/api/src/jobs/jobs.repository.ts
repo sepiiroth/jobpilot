@@ -112,11 +112,27 @@ export class JobsRepository {
   ) {
     const row = await this.db.searchMatch.findFirst({
       where: { id, userId, passed: true },
+      include: { offer: true },
     });
     if (!row) return null;
-    const updated = await this.db.userJobMatch.updateMany({
-      where: { userId, jobOfferId: row.jobOfferId },
-      data: { status },
+    const updated = await this.db.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${'offer-status:' + userId + ':' + row.offer.dedupKey},0))`;
+      return tx.userJobMatch.updateMany({
+        where: {
+          userId,
+          OR: [
+            { jobOfferId: row.jobOfferId },
+            {
+              jobOffer: {
+                dedupKey: row.offer.dedupKey,
+                fetchedAt: { gte: new Date(Date.now() - 30 * 86400000) },
+              },
+            },
+            { jobOffer: { url: row.offer.url } },
+          ],
+        },
+        data: { status },
+      });
     });
     return updated.count ? this.get(userId, id) : null;
   }

@@ -21,7 +21,8 @@
     "./llm": "./src/llm.ts",
     "./collection": "./src/collection.ts",
     "./jobs": "./src/jobs.ts",
-    "./matching": "./src/matching.ts"
+    "./matching": "./src/matching.ts",
+    "./email": "./src/email.ts"
   },
   "dependencies": {
     "zod": "4.6.7"

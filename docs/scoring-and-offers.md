@@ -1,6 +1,6 @@
 # Job scoring and offers
 
-Phase 8 consumes the BullMQ `scoring` queue after collection and offer embeddings. The collection remains active until scoring finishes, preserving the single-run-per-user rule. The worker uses the user's configured scoring provider/model through the shared LLM module; no additional dependency or provider key is required.
+The scoring pipeline consumes the BullMQ `scoring` queue after collection and offer embeddings. The collection remains active until scoring finishes, preserving the single-run-per-user rule. The worker uses the user's configured scoring provider/model through the shared LLM module; no additional dependency or provider key is required.
 
 ## Three stages
 

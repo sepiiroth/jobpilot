@@ -9,7 +9,7 @@ pnpm --filter @jobpilot/api start
 pnpm --filter @jobpilot/worker start
 ```
 
-Use the dashboard collection button. Progress refreshes every three seconds. The report displays processed sources, offers found, new matches, duplicates and current embeddings, with source errors in French. Source selection applies to each active search. Email alerts remain unavailable until phase 9. Scoring and the offers list belong to phase 8.
+Use the dashboard collection button. Progress refreshes every three seconds. The report displays processed sources, offers found, new matches, duplicates and current embeddings, with source errors in French. Source selection applies to each active search. Email alerts are supported through the [phase 9 IMAP connector](email-alerts.md). Scoring and the offers list belong to phase 8.
 
 ## API and persistence
 

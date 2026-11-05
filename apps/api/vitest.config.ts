@@ -11,6 +11,8 @@ export default defineConfig({
         '../../packages/shared/src/matching.ts',
         '../../packages/db/src/matching-repository.ts',
         '../worker/src/matching/scoring.ts',
+        '../worker/src/email/email-alerts.ts',
+        '../../packages/db/src/email-repository.ts',
       ],
       allowExternal: true,
       exclude: ['src/**/*.test.ts'],
@@ -19,6 +21,18 @@ export default defineConfig({
         statements: 80,
         functions: 80,
         branches: 80,
+        '../worker/src/email/email-alerts.ts': {
+          lines: 80,
+          statements: 80,
+          functions: 80,
+          branches: 80,
+        },
+        '../../packages/db/src/email-repository.ts': {
+          lines: 80,
+          statements: 80,
+          functions: 80,
+          branches: 80,
+        },
         '../worker/src/matching/scoring.ts': {
           lines: 80,
           statements: 80,

@@ -1,3 +1,9 @@
+import { EmailAlerts } from '../email/email-alerts.ts';
+import {
+  emailEnvironmentSchema,
+  type EmailEnvironment,
+} from '@jobpilot/shared/email';
+import { EmailAlertSource } from '@jobpilot/sources';
 import { ScoringPipeline } from '../matching/scoring.ts';
 import { Redis } from 'ioredis';
 import { createHash } from 'node:crypto';
@@ -23,6 +29,7 @@ import {
   SourceError,
   type JobSource,
   type JsonTransport,
+  type Resolver,
 } from '@jobpilot/sources';
 export interface RuntimeQueues {
   collection: Queue;
@@ -44,10 +51,14 @@ export class CollectionRuntime {
     private readonly config: CollectionEnvironment & {
       VALKEY_URL: string;
       SCORING_LLM_TOP_N?: number;
-    },
+    } & Partial<EmailEnvironment>,
     private readonly queues: RuntimeQueues,
-    private readonly sources: JobSource[] = jobSources,
+    private readonly sources: JobSource[] = [
+      ...jobSources,
+      new EmailAlertSource(),
+    ],
     private readonly transport?: JsonTransport,
+    private readonly emailResolver?: Resolver,
   ) {}
   async start() {
     this.quota = new Redis(this.config.VALKEY_URL, {
@@ -210,6 +221,28 @@ export class CollectionRuntime {
       void repository.heartbeat(userId, runId, token).catch(() => {});
     }, 15000);
     try {
+      const emailConfig = {
+        ...emailEnvironmentSchema.parse({}),
+        ...this.config,
+      };
+      const emailAlerts = new EmailAlerts(
+        this.db,
+        this.llm,
+        this.crypto,
+        emailConfig,
+        undefined,
+        this.emailResolver,
+      );
+      let emailResult: ReturnType<EmailAlerts['collect']> | undefined;
+      const email = {
+        configured: await emailAlerts.configured(userId),
+        read: () =>
+          (emailResult ??= emailAlerts.collect(
+            userId,
+            () => this.permit('email'),
+            deadline,
+          )),
+      };
       const companies = await this.db.trackedCompany.findMany({
         where: { userId },
         select: { name: true, atsType: true, atsToken: true },
@@ -281,6 +314,7 @@ export class CollectionRuntime {
             throw new SourceError('SEARCH_REMOVED');
           if (!source) throw new SourceError('SOURCE_NOT_AVAILABLE');
           const ctx = {
+            email,
             companies,
             credentials,
             maxPages: this.config.COLLECTION_MAX_PAGES,

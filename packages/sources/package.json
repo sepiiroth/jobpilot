@@ -10,16 +10,19 @@
   },
   "devDependencies": {
     "@jobpilot/config": "workspace:*",
+    "@types/mailparser": "3.9.0",
     "@types/node": "24.10.1",
     "@types/sanitize-html": "2.16.2",
-    "vitest": "5.1.0",
-    "@vitest/coverage-v8": "5.1.0"
+    "@vitest/coverage-v8": "5.1.0",
+    "vitest": "5.1.0"
   },
   "dependencies": {
     "@jobpilot/shared": "workspace:*",
-    "zod": "4.6.7",
+    "imapflow": "2.10.2",
+    "mailparser": "3.14.2",
+    "sanitize-html": "2.18.1",
     "undici": "8.12.4",
-    "sanitize-html": "2.18.1"
+    "zod": "4.6.7"
   },
   "exports": {
     ".": "./src/index.ts"
