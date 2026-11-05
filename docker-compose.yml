@@ -35,7 +35,11 @@ services:
       retries: 5
   mailpit:
     image: axllent/mailpit:v1.27.10
-    ports: ['127.0.0.1:${MAILPIT_HTTP_PORT:-8025}:8025', '127.0.0.1:${MAILPIT_SMTP_PORT:-1025}:1025']
+    ports:
+      [
+        '127.0.0.1:${MAILPIT_HTTP_PORT:-8025}:8025',
+        '127.0.0.1:${MAILPIT_SMTP_PORT:-1025}:1025',
+      ]
 volumes:
   postgres_data:
   valkey_data:

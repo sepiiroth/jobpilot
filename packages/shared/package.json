@@ -6,9 +6,18 @@
   "scripts": {
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "test": "node --test"
+    "test": "vitest run"
   },
   "devDependencies": {
-    "@jobpilot/config": "workspace:*"
+    "@jobpilot/config": "workspace:*",
+    "vitest": "5.1.0",
+    "@types/node": "24.10.1"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./dedup": "./src/dedup.ts"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
   }
 }

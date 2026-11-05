@@ -1,0 +1,301 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                String              @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  createdAt         DateTime            @default(now()) @db.Timestamptz
+  email             String              @unique
+  passwordHash      String
+  locale            String              @default("fr")
+  session           Session[]
+  userSecret        UserSecret[]
+  userSettings      UserSettings[]
+  resume            Resume[]
+  search            Search[]
+  trackedCompany    TrackedCompany[]
+  userJobMatch      UserJobMatch[]
+  collectionRun     CollectionRun[]
+  generatedDocument GeneratedDocument[]
+  application       Application[]
+  llmUsage          LlmUsage[]
+  auditLog          AuditLog[]
+
+  @@map("users")
+}
+
+model Session {
+  id         String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  createdAt  DateTime @default(now()) @db.Timestamptz
+  tokenHash  String   @unique
+  expiresAt  DateTime @db.Timestamptz
+  ip         String?
+  userAgent  String?
+  lastSeenAt DateTime @default(now()) @db.Timestamptz
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, id])
+  @@index([userId])
+  @@map("sessions")
+}
+
+model UserSecret {
+  id         String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  createdAt  DateTime @default(now()) @db.Timestamptz
+  kind       String
+  ciphertext Bytes
+  iv         Bytes
+  authTag    Bytes
+  keyVersion Int
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind])
+  @@unique([userId, id])
+  @@index([userId])
+  @@map("user_secrets")
+}
+
+model UserSettings {
+  id                    String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  createdAt             DateTime @default(now()) @db.Timestamptz
+  llmProvider           String
+  generationModel       String
+  scoringModel          String
+  embeddingModel        String
+  collectionCron        String?
+  collectionCooldownMin Int      @default(30)
+  userId                String   @db.Uuid
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId])
+  @@unique([userId, id])
+  @@index([userId])
+  @@map("user_settings")
+}
+
+model Resume {
+  documents GeneratedDocument[] @relation("GeneratedDocument_resume")
+
+  searches Search[] @relation("Search_resume")
+
+  id         String                       @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  createdAt  DateTime                     @default(now()) @db.Timestamptz
+  title      String
+  data       Json                         @db.JsonB
+  embedding  Unsupported("vector(1024)")?
+  isArchived Boolean                      @default(false)
+  userId     String                       @db.Uuid
+  user       User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, id])
+  @@index([userId])
+  @@map("resumes")
+}
+
+model Search {
+  matches UserJobMatch[] @relation("UserJobMatch_search")
+
+  resume Resume @relation("Search_resume", fields: [userId, resumeId], references: [userId, id], onDelete: Cascade)
+
+  id              String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  createdAt       DateTime @default(now()) @db.Timestamptz
+  resumeId        String   @db.Uuid
+  name            String
+  titles          String[]
+  includeKeywords String[]
+  excludeKeywords String[]
+  locations       Json     @db.JsonB
+  radiusKm        Int?
+  remote          String[]
+  contractTypes   String[]
+  salaryMin       Decimal?
+  seniority       String?
+  sources         String[]
+  isActive        Boolean  @default(true)
+  userId          String   @db.Uuid
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, id])
+  @@index([userId])
+  @@map("searches")
+}
+
+model TrackedCompany {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  name      String
+  atsType   String
+  atsToken  String
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, atsType, atsToken])
+  @@unique([userId, id])
+  @@index([userId])
+  @@map("tracked_companies")
+}
+
+model JobOffer {
+  applications Application[] @relation("Application_jobOffer")
+
+  documents GeneratedDocument[] @relation("GeneratedDocument_jobOffer")
+
+  matches UserJobMatch[] @relation("UserJobMatch_jobOffer")
+
+  id             String                       @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  createdAt      DateTime                     @default(now()) @db.Timestamptz
+  sourceId       String
+  externalId     String
+  dedupKey       String
+  url            String
+  alternateUrls  String[]
+  title          String
+  company        String
+  location       Json                         @db.JsonB
+  remote         String
+  contractType   String
+  salaryMin      Decimal?
+  salaryMax      Decimal?
+  salaryCurrency String?
+  description    String
+  publishedAt    DateTime?                    @db.Timestamptz
+  fetchedAt      DateTime                     @default(now()) @db.Timestamptz
+  embedding      Unsupported("vector(1024)")?
+
+  @@unique([sourceId, externalId])
+  @@index([dedupKey, fetchedAt])
+  @@map("job_offers")
+}
+
+model UserJobMatch {
+  jobOffer JobOffer @relation("UserJobMatch_jobOffer", fields: [jobOfferId], references: [id], onDelete: Cascade)
+
+  search Search @relation("UserJobMatch_search", fields: [userId, searchId], references: [userId, id], onDelete: Cascade)
+
+  id               String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  createdAt        DateTime @default(now()) @db.Timestamptz
+  jobOfferId       String   @db.Uuid
+  searchId         String   @db.Uuid
+  hardFilterPassed Boolean
+  similarity       Float?
+  llmScore         Int?
+  llmAnalysis      Json?    @db.JsonB
+  status           String   @default("new")
+  userId           String   @db.Uuid
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobOfferId])
+  @@unique([userId, id])
+  @@index([userId])
+  @@map("user_job_matches")
+}
+
+model CollectionRun {
+  id         String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  createdAt  DateTime  @default(now()) @db.Timestamptz
+  trigger    String
+  status     String    @default("queued")
+  startedAt  DateTime? @db.Timestamptz
+  finishedAt DateTime? @db.Timestamptz
+  stats      Json      @default("{}") @db.JsonB
+  errors     Json      @default("[]") @db.JsonB
+  userId     String    @db.Uuid
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, id])
+  @@index([userId])
+  @@map("collection_runs")
+}
+
+model GeneratedDocument {
+  letterApplications Application[] @relation("Application_letterDocument")
+
+  resumeApplications Application[] @relation("Application_resumeDocument")
+
+  jobOffer JobOffer @relation("GeneratedDocument_jobOffer", fields: [jobOfferId], references: [id], onDelete: Cascade)
+
+  resume Resume @relation("GeneratedDocument_resume", fields: [userId, resumeId], references: [userId, id], onDelete: Cascade)
+
+  id              String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  createdAt       DateTime @default(now()) @db.Timestamptz
+  jobOfferId      String   @db.Uuid
+  resumeId        String   @db.Uuid
+  kind            String
+  version         Int
+  content         Json     @db.JsonB
+  params          Json     @db.JsonB
+  integrityReport Json?    @db.JsonB
+  model           String
+  tokensIn        Int
+  tokensOut       Int
+  userId          String   @db.Uuid
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobOfferId, resumeId, kind, version])
+  @@unique([userId, id])
+  @@index([userId])
+  @@map("generated_documents")
+}
+
+model Application {
+  letterDocument GeneratedDocument? @relation("Application_letterDocument", fields: [userId, letterDocId], references: [userId, id], onDelete: NoAction)
+
+  resumeDocument GeneratedDocument? @relation("Application_resumeDocument", fields: [userId, resumeDocId], references: [userId, id], onDelete: NoAction)
+
+  jobOffer JobOffer @relation("Application_jobOffer", fields: [jobOfferId], references: [id], onDelete: Cascade)
+
+  id          String    @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  createdAt   DateTime  @default(now()) @db.Timestamptz
+  jobOfferId  String    @db.Uuid
+  status      String    @default("to_apply")
+  appliedAt   DateTime? @db.Timestamptz
+  followUpAt  DateTime? @db.Timestamptz
+  notes       String?
+  resumeDocId String?   @db.Uuid
+  letterDocId String?   @db.Uuid
+  userId      String    @db.Uuid
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobOfferId])
+  @@unique([userId, id])
+  @@index([userId])
+  @@map("applications")
+}
+
+model LlmUsage {
+  id           String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  createdAt    DateTime @default(now()) @db.Timestamptz
+  purpose      String
+  provider     String
+  model        String
+  tokensIn     Int
+  tokensOut    Int
+  costEstimate Decimal  @db.Decimal(18, 8)
+  userId       String   @db.Uuid
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, id])
+  @@index([userId])
+  @@map("llm_usage")
+}
+
+model AuditLog {
+  id        String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  action    String
+  metadata  Json     @db.JsonB
+  ip        String?
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, id])
+  @@index([userId])
+  @@map("audit_logs")
+}

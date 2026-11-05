@@ -29,3 +29,15 @@ Only authorized APIs and user-owned email alerts are allowed. Scrapers violating
 Licensed under AGPL-3.0-only. See LICENSE.
 
 Host ports can be overridden with VALKEY_PORT, MAILPIT_HTTP_PORT and MAILPIT_SMTP_PORT in .env when the defaults are occupied.
+
+## Phase 1: database and shared schemas
+
+Set DATABASE_URL in .env to your local PostgreSQL connection string. Credentials must match the Compose variables. Never commit this file.
+
+Run pnpm db:generate, pnpm db:migrate, pnpm lint, pnpm typecheck and pnpm test. Integration tests require Docker and create an isolated temporary PostgreSQL container. They do not use or erase your local database.
+
+For the optional development seed, set SEED_PASSWORD_HASH in .env to an argon2id password hash, then run pnpm db:seed. This creates one explicitly fictional account (demo@example.invalid), one synthetic resume and two searches; rerunning does not duplicate them. Production seeding is refused.
+
+Vectors have 1024 dimensions in this migration. Changing EMBEDDING_DIMENSIONS requires a matching schema migration, rebuilt indexes and recalculation of stored embeddings; changing an environment variable alone is insufficient. Zero and non-finite vectors are rejected. The similarity repository only returns offers linked to the requested user and excludes ignored matches.
+
+Shared schemas are exported from @jobpilot/shared. Node-only SHA-256 deduplication helpers are exported separately from @jobpilot/shared/dedup to keep node:crypto out of future browser bundles.

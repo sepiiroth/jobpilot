@@ -14,7 +14,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "node scripts/prepare.mjs",
-    "secrets:scan": "gitleaks dir --redact ."
+    "secrets:scan": "gitleaks dir --redact .",
+    "db:migrate": "pnpm --filter @jobpilot/db migrate",
+    "db:generate": "pnpm --filter @jobpilot/db generate",
+    "db:seed": "pnpm --filter @jobpilot/db seed"
   },
   "devDependencies": {
     "@commitlint/cli": "19.8.1",

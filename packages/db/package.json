@@ -5,10 +5,28 @@
   "type": "module",
   "scripts": {
     "lint": "eslint . --max-warnings 0",
-    "typecheck": "tsc --noEmit",
-    "test": "node --test"
+    "typecheck": "prisma generate && tsc --noEmit",
+    "test": "vitest run",
+    "generate": "prisma generate",
+    "migrate": "prisma migrate deploy",
+    "seed": "node --env-file=../../.env --experimental-strip-types src/seed.ts"
   },
   "devDependencies": {
-    "@jobpilot/config": "workspace:*"
+    "@jobpilot/config": "workspace:*",
+    "prisma": "7.10.1",
+    "vitest": "5.1.0",
+    "testcontainers": "12.2.1",
+    "@types/pg": "8.23.1",
+    "@types/node": "24.10.1"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "7.10.1",
+    "@prisma/adapter-pg": "7.10.1",
+    "pg": "8.23.1",
+    "@jobpilot/shared": "workspace:*",
+    "zod": "4.6.7"
   }
 }
