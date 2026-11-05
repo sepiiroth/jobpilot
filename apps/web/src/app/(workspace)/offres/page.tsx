@@ -1,5 +1,5 @@
-import { PlaceholderPage } from '@/components/placeholder-page';
+import { OffersList } from '@/components/offers';
 export const metadata = { title: 'Offres' };
 export default function Page() {
-  return <PlaceholderPage section="offers" />;
+  return <OffersList />;
 }

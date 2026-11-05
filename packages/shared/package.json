@@ -19,7 +19,9 @@
     "./profile": "./src/profile.ts",
     "./crypto": "./src/crypto.ts",
     "./llm": "./src/llm.ts",
-    "./collection": "./src/collection.ts"
+    "./collection": "./src/collection.ts",
+    "./jobs": "./src/jobs.ts",
+    "./matching": "./src/matching.ts"
   },
   "dependencies": {
     "zod": "4.6.7"

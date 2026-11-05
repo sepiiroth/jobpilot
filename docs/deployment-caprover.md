@@ -1,6 +1,6 @@
 # Deploy JobPilot on CapRover
 
-This guide covers phase 4: the web shell, authenticated API and an idle standalone worker. It does not enable collection, scoring, scheduling or backups. The assistant prepares these files and verifies local images; only the maintainer publishes releases and starts deployments.
+This guide covers the containerized web, authenticated API and standalone worker. Phases 5–8 add profiles, AI, collection and scoring; scheduling and backups remain later phases. The assistant prepares these files and verifies local images; only the maintainer publishes releases and starts deployments.
 
 ## 1. Prerequisites
 
@@ -129,11 +129,11 @@ The jobs run in this order:
 1. CI validates the repository.
 2. A matrix builds web, API and worker locally on runners. Trivy rejects critical vulnerabilities before any image is pushed.
 3. Images are published as ghcr.io/<lowercase-owner>/jobpilot-<app>:<version>-<12-character-commit-id>.
-4. Deployment actions submit the worker, then API, then web images to CapRover. A failed earlier step stops subsequent steps.
+4. Deployment actions submit the API, then worker, then web images to CapRover. A failed earlier step stops subsequent steps.
 
 The CapRover action submits deployments in detached mode. A successful action means the request was accepted, not that the new containers are healthy. Check the three apps' logs and Docker health states after every release; do not regard a green submission alone as successful service verification. Release submissions are serialized so separate tag workflows cannot interleave.
 
-The API needs no manual migration step. For the first release, wait for database migrations to complete before creating the first account. A worker may start before migrations because its idle readiness check only verifies the database connection.
+The API needs no manual migration step. For the first release, wait for database migrations to complete before creating the first account. Deploy the API first and wait for its migration/startup to succeed before starting the worker. The scoring worker requires the new scoring tables at startup. The local smoke stack enforces this order through the API health dependency.
 
 ## 9. First account and runtime checks
 
@@ -206,3 +206,7 @@ Production stages use Node.js 24.22.1 on Debian 13 (trixie-slim). The build stag
 Phase 6 adds the optional AI quota, timeout, pricing and trusted Ollama origins described in [the LLM deployment guide](llm-and-resume-import.md). Configure the same encryption key versions and quota settings on API and worker. Keep only your trusted Ollama origin in the administrator allowlist when using a remote or internal instance.
 
 PDF import and synchronous resume embeddings can outlast a standard short proxy timeout. In the API app's custom Nginx configuration, set `proxy_read_timeout 90s;` and `proxy_send_timeout 90s;` in the appropriate server/location context for the default AI limits. Adjust the proxy and browser timeout together if increasing the AI deadlines or retries. No credentials belong in Nginx configuration.
+
+## Phase 8: scoring deployment
+
+Configure SCORING_LLM_TOP_N in the worker (default 30, range 0–100). Apply the updated API before the worker so migration 20261105210000_job_scoring exists before queue recovery. The release workflow submits apps in API → worker → web order; review API migration logs and health before proceeding with a manual deployment. The worker never runs migrations. See [scoring and offers](scoring-and-offers.md) for private vectors, durable attempt budgets and verification.

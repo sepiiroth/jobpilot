@@ -43,6 +43,8 @@ services:
   worker:
     image: jobpilot-worker:phase4
     depends_on:
+      api:
+        condition: service_healthy
       database:
         condition: service_healthy
       valkey:

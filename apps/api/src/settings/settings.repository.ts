@@ -18,10 +18,14 @@ export class SettingsRepository {
           ? Prisma.DbNull
           : (input.imap as Prisma.InputJsonValue),
     };
-    return this.db.userSettings.upsert({
-      where: { userId },
-      create: { ...data, userId },
-      update: data,
+    return this.db.$transaction(async (tx) => {
+      const result = await tx.userSettings.upsert({
+        where: { userId },
+        create: { ...data, userId },
+        update: data,
+      });
+      await tx.searchMatch.deleteMany({ where: { userId } });
+      return result;
     });
   }
   secrets(userId: string) {

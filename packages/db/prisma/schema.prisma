@@ -28,6 +28,8 @@ model User {
   collectionStep    CollectionStep[]
   collectionItem    CollectionItem[]
   offerEmbedding    OfferEmbedding[]
+  scoringTask       ScoringTask[]
+  searchMatch       SearchMatch[]
 
   @@map("users")
 }
@@ -111,6 +113,7 @@ model Resume {
 
 model Search {
   matches UserJobMatch[] @relation("UserJobMatch_search")
+  scored  SearchMatch[]
 
   resume Resume @relation("Search_resume", fields: [userId, resumeId], references: [userId, id], onDelete: Cascade)
 
@@ -161,6 +164,7 @@ model JobOffer {
   aliases   JobOfferAlias[]
   collected CollectionItem[]
   vectors   OfferEmbedding[]
+  scored    SearchMatch[]
 
   id             String                       @id @default(dbgenerated("uuidv7()")) @db.Uuid
   createdAt      DateTime                     @default(now()) @db.Timestamptz
@@ -212,21 +216,24 @@ model UserJobMatch {
 }
 
 model CollectionRun {
-  steps       CollectionStep[]
-  items       CollectionItem[]
-  enqueuedAt  DateTime?        @db.Timestamptz
-  heartbeatAt DateTime?        @db.Timestamptz
-  workerToken String?          @db.Uuid
-  id          String           @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  createdAt   DateTime         @default(now()) @db.Timestamptz
-  trigger     String
-  status      String           @default("queued")
-  startedAt   DateTime?        @db.Timestamptz
-  finishedAt  DateTime?        @db.Timestamptz
-  stats       Json             @default("{}") @db.JsonB
-  errors      Json             @default("[]") @db.JsonB
-  userId      String           @db.Uuid
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scoringTasks ScoringTask[]
+  scored       SearchMatch[]
+  stage        String           @default("collection")
+  steps        CollectionStep[]
+  items        CollectionItem[]
+  enqueuedAt   DateTime?        @db.Timestamptz
+  heartbeatAt  DateTime?        @db.Timestamptz
+  workerToken  String?          @db.Uuid
+  id           String           @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  createdAt    DateTime         @default(now()) @db.Timestamptz
+  trigger      String
+  status       String           @default("queued")
+  startedAt    DateTime?        @db.Timestamptz
+  finishedAt   DateTime?        @db.Timestamptz
+  stats        Json             @default("{}") @db.JsonB
+  errors       Json             @default("[]") @db.JsonB
+  userId       String           @db.Uuid
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, id])
   @@index([userId])
@@ -385,4 +392,45 @@ model OfferEmbedding {
   @@unique([userId, jobOfferId, profileKey, contentHash])
   @@index([userId, status])
   @@map("offer_embeddings")
+}
+
+model ScoringTask {
+  id           String        @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId       String        @db.Uuid
+  runId        String        @db.Uuid
+  searchId     String        @db.Uuid
+  fingerprint  String
+  budget       Int
+  attemptedIds String[]      @default([])
+  status       String        @default("pending")
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  run          CollectionRun @relation(fields: [userId, runId], references: [userId, id], onDelete: Cascade)
+
+  @@unique([runId, searchId])
+  @@index([userId])
+  @@map("scoring_tasks")
+}
+
+model SearchMatch {
+  id          String        @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  userId      String        @db.Uuid
+  searchId    String        @db.Uuid
+  jobOfferId  String        @db.Uuid
+  runId       String        @db.Uuid
+  createdAt   DateTime      @default(now()) @db.Timestamptz
+  inputKey    String
+  passed      Boolean
+  notes       String[]
+  similarity  Float?
+  llmScore    Int?
+  llmAnalysis Json?         @db.JsonB
+  state       String        @default("waiting")
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  search      Search        @relation(fields: [userId, searchId], references: [userId, id], onDelete: Cascade)
+  offer       JobOffer      @relation(fields: [jobOfferId], references: [id], onDelete: Cascade)
+  run         CollectionRun @relation(fields: [userId, runId], references: [userId, id], onDelete: Cascade)
+
+  @@unique([userId, searchId, jobOfferId])
+  @@index([userId, passed, llmScore])
+  @@map("search_matches")
 }

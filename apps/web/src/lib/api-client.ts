@@ -1,3 +1,11 @@
+import {
+  jobQuerySchema,
+  jobRecordSchema,
+  jobsPageSchema,
+  jobsSummarySchema,
+  jobStatusInputSchema,
+  type JobQuery,
+} from '@jobpilot/shared/jobs';
 import { collectionRunSchema } from '@jobpilot/shared/collection';
 import { importProposalSchema, usageSummarySchema } from '@jobpilot/shared/llm';
 import { z } from 'zod';
@@ -95,6 +103,23 @@ export function createApiClient(fetcher: typeof fetch = fetch) {
     }
   }
   return {
+    jobs: async (query: JobQuery) => {
+      const values = jobQuerySchema.parse(query);
+      const params = new URLSearchParams(
+        Object.entries(values).map(([k, v]) => [k, String(v)]),
+      );
+      return jobsPageSchema.parse(await send('/jobs?' + params));
+    },
+    job: async (id: string) => jobRecordSchema.parse(await send('/jobs/' + id)),
+    jobStatus: async (id: string, status: 'new' | 'interesting' | 'ignored') =>
+      jobRecordSchema.parse(
+        await write(
+          '/jobs/' + id + '/status',
+          jobStatusInputSchema.parse({ status }),
+        ),
+      ),
+    jobsSummary: async () =>
+      jobsSummarySchema.parse(await send('/jobs/summary')),
     latestCollection: async () =>
       collectionRunSchema.nullable().parse(await send('/collections')),
     collection: async (id: string) =>

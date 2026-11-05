@@ -84,6 +84,7 @@ export class LlmService {
         return { ...result, value: parsed.data };
       },
       'text',
+      operation === 'scoring' ? 0 : this.config.LLM_MAX_RETRIES,
     );
   }
   async generateText(
@@ -145,9 +146,10 @@ export class LlmService {
     reservation: number,
     run: (provider: LlmProvider, signal: AbortSignal) => Promise<LlmResult<T>>,
     operation: 'text' | 'embedding',
+    maxRetries = this.config.LLM_MAX_RETRIES,
   ): Promise<T> {
     const provider = this.factory(selected, operation);
-    for (let attempt = 0; attempt <= this.config.LLM_MAX_RETRIES; attempt++) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
       const record = await this.repository.reserve(
         userId,
         {
@@ -187,8 +189,7 @@ export class LlmService {
         await this.repository.settle(userId, record.id, null, null);
         const safe =
           error instanceof LlmError ? error : new LlmError('LLM_UNAVAILABLE');
-        if (!safe.retryable || attempt === this.config.LLM_MAX_RETRIES)
-          throw safe;
+        if (!safe.retryable || attempt === maxRetries) throw safe;
       } finally {
         if (timer) clearTimeout(timer);
       }

@@ -5,6 +5,16 @@ import { useTranslations } from 'next-intl';
 import { apiClient, ApiClientError } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+const reportSources = new Set([
+  'adzuna',
+  'greenhouse',
+  'lever',
+  'ashby',
+  'email',
+  'scoring',
+  'embedding',
+  'worker',
+]);
 export function CollectionPanel() {
   const t = useTranslations('Collection');
   const [id, setId] = useState<string | undefined>();
@@ -58,7 +68,11 @@ export function CollectionPanel() {
       {run.data && stats && (
         <>
           <p role="status" aria-live="polite">
-            {t('status_' + run.data.status)}
+            {t(
+              run.data.stage === 'scoring' && active
+                ? 'scoring'
+                : 'status_' + run.data.status,
+            )}
           </p>
           <Progress
             value={
@@ -94,7 +108,12 @@ export function CollectionPanel() {
               <ul>
                 {run.data.errors.map((e, i) => (
                   <li key={i}>
-                    {e.source} :{' '}
+                    {t(
+                      reportSources.has(e.source)
+                        ? 'source_' + e.source
+                        : 'source_other',
+                    )}{' '}
+                    :{' '}
                     {t(
                       'error_' +
                         (e.code === 'SOURCE_NOT_CONFIGURED'
@@ -105,9 +124,11 @@ export function CollectionPanel() {
                             ? 'limit'
                             : e.code === 'SOURCE_NOT_AVAILABLE'
                               ? 'unavailable'
-                              : e.code === 'EMBEDDING_FAILED'
-                                ? 'embedding'
-                                : 'source'),
+                              : e.code.startsWith('SCORING_')
+                                ? 'scoring'
+                                : e.code === 'EMBEDDING_FAILED'
+                                  ? 'embedding'
+                                  : 'source'),
                     )}
                   </li>
                 ))}

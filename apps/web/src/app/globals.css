@@ -1183,3 +1183,122 @@ a {
     padding: 18px;
   }
 }
+.workspace-page {
+  display: grid;
+  gap: 1.5rem;
+  min-width: 0;
+}
+.jobs-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+.jobs-filters label {
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.875rem;
+  min-width: 0;
+}
+.jobs-filters select {
+  width: 100%;
+  min-width: 0;
+  padding: 0.55rem;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--foreground);
+}
+.job-link {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.job-detail h1 {
+  overflow-wrap: anywhere;
+}
+.job-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.job-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1rem 0;
+}
+.job-facts dt {
+  color: var(--muted-foreground);
+  font-size: 0.85rem;
+}
+.job-facts dd {
+  margin-top: 0.4rem;
+}
+.job-analysis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+.job-analysis ul,
+.job-detail .profile-notice ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin-top: 0.75rem;
+}
+.job-analysis li {
+  margin-bottom: 0.65rem;
+  overflow-wrap: anywhere;
+}
+.job-description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.8;
+}
+.job-best {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+.job-best li {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+@media (max-width: 700px) {
+  .jobs-filters,
+  .job-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .job-analysis {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 420px) {
+  .jobs-filters {
+    grid-template-columns: 1fr;
+  }
+}
+.page-heading h1 {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+  line-height: 1.2;
+  margin: 0.75rem 0;
+}
+.page-heading p:not(.eyebrow) {
+  color: var(--muted-foreground);
+  line-height: 1.7;
+  max-width: 70ch;
+}
+.job-detail h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 0.6rem;
+}
+.job-analysis h3 {
+  font-weight: 600;
+}

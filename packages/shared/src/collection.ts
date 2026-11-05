@@ -19,6 +19,7 @@ export const collectionErrorSchema = z.object({
 });
 export const collectionRunSchema = z.object({
   id: z.uuid(),
+  stage: z.enum(['collection', 'scoring']).default('collection'),
   status: z.enum([
     'queued',
     'running',

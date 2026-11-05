@@ -1,3 +1,5 @@
+import { JobsController, JobsService } from './jobs/jobs.ts';
+import { JobsRepository } from './jobs/jobs.repository.ts';
 import { BullModule, getQueueToken } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import { queueConnection } from '@jobpilot/shared/collection';
@@ -210,6 +212,16 @@ export async function createApplication(
       },
     ],
   })(CollectionsModule);
+  class JobsModule {}
+  Module({
+    controllers: [JobsController],
+    providers: [
+      {
+        provide: JobsService,
+        useFactory: () => new JobsService(new JobsRepository(db)),
+      },
+    ],
+  })(JobsModule);
   class AppModule {}
   Module({
     imports: [
@@ -234,6 +246,7 @@ export async function createApplication(
       HealthModule,
       LlmHttpModule,
       CollectionsModule,
+      JobsModule,
     ],
     providers: [
       { provide: Reflector, useValue: new Reflector() },

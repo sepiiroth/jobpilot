@@ -16,6 +16,16 @@ export class VectorRepository {
   constructor(db: PrismaClient) {
     this.db = db;
   }
+  async offerSimilarities(
+    userId: string,
+    resumeId: string,
+    profile: string,
+    offerIds: string[],
+  ): Promise<Array<{ id: string; similarity: number }>> {
+    if (!offerIds.length) return [];
+    return this.db
+      .$queryRaw`SELECT j.id, 1-(e.embedding <=> r.embedding) AS similarity FROM offer_embeddings e JOIN job_offers j ON j.id=e."jobOfferId" JOIN resumes r ON r.id=${resumeId}::uuid AND r."userId"=e."userId" WHERE e."userId"=${userId}::uuid AND e."profileKey"=${profile} AND e."contentHash"=j."contentHash" AND e.status='ready' AND e.embedding IS NOT NULL AND r.embedding IS NOT NULL AND r."embeddingStatus"='ready' AND r."embeddingProvider"=e.provider AND r."embeddingModel"=e.model AND j.id=ANY(${offerIds}::uuid[])`;
+  }
   async setResumeEmbedding(
     userId: string,
     resumeId: string,

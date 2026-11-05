@@ -1,3 +1,4 @@
+import { ScoringPipeline } from '../matching/scoring.ts';
 import { Redis } from 'ioredis';
 import { createHash } from 'node:crypto';
 import { randomUUID } from 'node:crypto';
@@ -40,7 +41,10 @@ export class CollectionRuntime {
     private readonly db: PrismaClient,
     private readonly llm: LlmService,
     private readonly crypto: CryptoService,
-    private readonly config: CollectionEnvironment & { VALKEY_URL: string },
+    private readonly config: CollectionEnvironment & {
+      VALKEY_URL: string;
+      SCORING_LLM_TOP_N?: number;
+    },
     private readonly queues: RuntimeQueues,
     private readonly sources: JobSource[] = jobSources,
     private readonly transport?: JsonTransport,
@@ -98,7 +102,26 @@ export class CollectionRuntime {
           })
           .catch(() => {});
     });
-    this.workers.push(collection, embedding);
+    const scoring = new Worker(
+      'scoring',
+      (job) =>
+        new ScoringPipeline(
+          this.db,
+          this.llm,
+          this.config.SCORING_LLM_TOP_N ?? 30,
+        ).run(
+          collectionJobSchema.parse(job.data).userId,
+          collectionJobSchema.parse(job.data).runId,
+          () => this.closing,
+        ),
+      { ...options, concurrency: 2 },
+    );
+    scoring.on('error', () => {});
+    scoring.on('failed', (job) => {
+      if (job && job.attemptsMade >= (job.opts.attempts ?? 1))
+        void this.fail(job).catch(() => {});
+    });
+    this.workers.push(collection, embedding, scoring);
     await Promise.all([
       ...this.workers.map((w) => w.waitUntilReady()),
       ...Array.from(this.events.values(), (e) => e.waitUntilReady()),
@@ -140,7 +163,9 @@ export class CollectionRuntime {
         orderBy: { createdAt: 'asc' },
       });
       for (const run of runs)
-        await this.queues.collection.add(
+        await (
+          run.stage === 'scoring' ? this.queues.scoring : this.queues.collection
+        ).add(
           'collect',
           { runId: run.id, userId: run.userId },
           {
@@ -337,7 +362,29 @@ export class CollectionRuntime {
             },
           });
       }
-      await repository.refresh(userId, runId, true, token);
+      await repository.refresh(userId, runId, false, token);
+      const handoff = await this.db.collectionRun.updateMany({
+        where: {
+          id: runId,
+          userId,
+          workerToken: token,
+          status: 'running',
+          stage: 'collection',
+        },
+        data: { stage: 'scoring', status: 'queued', workerToken: null },
+      });
+      if (handoff.count)
+        await this.queues.scoring.add(
+          'score',
+          { runId, userId },
+          {
+            jobId: runId,
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 1000 },
+            removeOnComplete: true,
+            removeOnFail: true,
+          },
+        );
     } catch (error) {
       await this.db.collectionRun.updateMany({
         where: { id: runId, userId, workerToken: token, status: 'running' },

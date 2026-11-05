@@ -30,6 +30,9 @@ export class ResumesRepository {
         },
       });
       if (!result.count) return null;
+      await tx.searchMatch.deleteMany({
+        where: { userId, search: { resumeId: id } },
+      });
       // Stored vectors must never survive an edit to their source text.
       await tx.$executeRaw`UPDATE resumes SET embedding = NULL WHERE id = ${id}::uuid AND "userId" = ${userId}::uuid`;
       return tx.resume.findFirst({ where: { userId, id } });

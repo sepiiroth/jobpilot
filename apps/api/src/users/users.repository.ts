@@ -27,6 +27,8 @@ export class UsersRepository {
           collectionSteps,
           collectionItems,
           offerEmbeddings,
+          searchMatches,
+          scoringTasks,
           offers,
         ] = await Promise.all([
           tx.resume.findMany({ where: { userId } }),
@@ -57,6 +59,8 @@ export class UsersRepository {
           tx.collectionStep.findMany({ where: { userId } }),
           tx.collectionItem.findMany({ where: { userId } }),
           tx.offerEmbedding.findMany({ where: { userId } }),
+          tx.searchMatch.findMany({ where: { userId } }),
+          tx.scoringTask.findMany({ where: { userId } }),
           tx.jobOffer.findMany({
             where: {
               OR: [
@@ -68,7 +72,7 @@ export class UsersRepository {
           }),
         ]);
         return {
-          schemaVersion: 2,
+          schemaVersion: 3,
           exportedAt: new Date().toISOString(),
           user,
           resumes,
@@ -87,6 +91,8 @@ export class UsersRepository {
           collectionSteps,
           collectionItems,
           offerEmbeddings,
+          searchMatches,
+          scoringTasks,
         };
       },
       { isolationLevel: 'RepeatableRead' },

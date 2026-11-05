@@ -111,11 +111,11 @@ export class CollectionRepository {
       finishedAt: run.finishedAt?.toISOString() ?? null,
     });
   }
-  async claim(userId: string, id: string) {
+  async claim(userId: string, id: string, stage = 'collection') {
     const token = randomUUID();
     const rows = await this.db.$queryRaw<
       Array<{ id: string }>
-    >`UPDATE collection_runs SET status='running', "startedAt"=COALESCE("startedAt",now()), "heartbeatAt"=now(), "workerToken"=${token}::uuid WHERE id=${id}::uuid AND "userId"=${userId}::uuid AND (status='queued' OR (status='running' AND "heartbeatAt"<now()-interval '2 minutes')) RETURNING id`;
+    >`UPDATE collection_runs SET status='running', "startedAt"=COALESCE("startedAt",now()), "heartbeatAt"=now(), "workerToken"=${token}::uuid WHERE id=${id}::uuid AND "userId"=${userId}::uuid AND stage=${stage} AND (status='queued' OR (status='running' AND "heartbeatAt"<now()-interval '2 minutes')) RETURNING id`;
     return rows.length ? token : null;
   }
   heartbeat(userId: string, id: string, token: string) {

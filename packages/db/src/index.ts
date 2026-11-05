@@ -17,3 +17,6 @@ export {
   embeddingProfile,
   offerContentHash,
 } from './collection-repository.ts';
+
+export { scoringKey, resultKey } from './scoring-key.ts';
+export { MatchingRepository } from './matching-repository.ts';

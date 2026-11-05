@@ -65,3 +65,7 @@ See [LLM configuration and PDF import](docs/llm-and-resume-import.md) for provid
 ## Phase 7: job collection
 
 See [collection setup and verification](docs/collection.md) for source configuration, manual runs, limits, progress, recovery and private offer embeddings. Run the API and worker alongside the web app.
+
+## Phase 8: scoring and offers
+
+See [scoring and offers](docs/scoring-and-offers.md) for the three-stage pipeline, persistent analysis limits, filters, status actions, dashboard summary and verification.

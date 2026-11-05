@@ -29,6 +29,7 @@ export class SearchesRepository {
       if (!id) return tx.search.create({ data: { ...data, userId } });
       if (!(await tx.search.updateMany({ where: { userId, id }, data })).count)
         return null;
+      await tx.searchMatch.deleteMany({ where: { userId, searchId: id } });
       return tx.search.findFirst({ where: { userId, id } });
     });
   }

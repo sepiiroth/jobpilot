@@ -15,3 +15,4 @@ export type {
   Usage,
   LlmResult,
 } from './provider.ts';
+export { jobScoringPrompt } from './prompts/job-scoring-v1.ts';

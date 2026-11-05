@@ -84,13 +84,6 @@ jobs:
           owner="${GITHUB_REPOSITORY_OWNER,,}"
           echo "prefix=ghcr.io/$owner/jobpilot" >> "$GITHUB_OUTPUT"
           echo "tag=${GITHUB_REF_NAME#v}-${GITHUB_SHA:0:12}" >> "$GITHUB_OUTPUT"
-      - name: Deploy internal worker
-        uses: caprover/deploy-from-github@058a3e0d8fb21bfc0ce207b79b1fc757d765a009
-        with:
-          server: ${{ secrets.CAPROVER_SERVER }}
-          app: jobpilot-worker
-          token: ${{ secrets.CAPROVER_WORKER_TOKEN }}
-          image: ${{ steps.release.outputs.prefix }}-worker:${{ steps.release.outputs.tag }}
       - name: Deploy API and run database migrations
         uses: caprover/deploy-from-github@058a3e0d8fb21bfc0ce207b79b1fc757d765a009
         with:
@@ -98,6 +91,13 @@ jobs:
           app: jobpilot-api
           token: ${{ secrets.CAPROVER_API_TOKEN }}
           image: ${{ steps.release.outputs.prefix }}-api:${{ steps.release.outputs.tag }}
+      - name: Deploy internal worker
+        uses: caprover/deploy-from-github@058a3e0d8fb21bfc0ce207b79b1fc757d765a009
+        with:
+          server: ${{ secrets.CAPROVER_SERVER }}
+          app: jobpilot-worker
+          token: ${{ secrets.CAPROVER_WORKER_TOKEN }}
+          image: ${{ steps.release.outputs.prefix }}-worker:${{ steps.release.outputs.tag }}
       - name: Deploy web
         uses: caprover/deploy-from-github@058a3e0d8fb21bfc0ce207b79b1fc757d765a009
         with:

@@ -71,7 +71,9 @@ export function WorkspaceShell({
     },
     onError: () => toast.error(t('logoutError')),
   });
-  const active = links.find((v) => v.href === pathname);
+  const isActive = (href: string) =>
+    pathname === href || pathname.startsWith(href + '/');
+  const active = links.find((v) => isActive(v.href));
   return (
     <SidebarProvider>
       <a href="#main-content" className="skip-link">
@@ -90,14 +92,12 @@ export function WorkspaceShell({
                   <SidebarMenuItem key={item.key}>
                     <SidebarMenuButton
                       asChild
-                      isActive={pathname === item.href}
+                      isActive={isActive(item.href)}
                       className="workspace-nav-link"
                     >
                       <WorkspaceLink
                         href={item.href}
-                        aria-current={
-                          pathname === item.href ? 'page' : undefined
-                        }
+                        aria-current={isActive(item.href) ? 'page' : undefined}
                       >
                         <item.icon aria-hidden="true" />
                         <span>{nav(item.key)}</span>

@@ -1,3 +1,4 @@
+import { scoringEnvironmentSchema } from '@jobpilot/shared/jobs';
 import { BullModule, getQueueToken } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import {
@@ -39,7 +40,8 @@ const schema = z
   })
   .extend(llmEnvironmentSchema.shape)
   .extend(cryptoEnvironmentSchema.shape)
-  .extend(collectionEnvironmentSchema.shape);
+  .extend(collectionEnvironmentSchema.shape)
+  .extend(scoringEnvironmentSchema.shape);
 try {
   const parsed = schema.safeParse(process.env);
   if (!parsed.success)

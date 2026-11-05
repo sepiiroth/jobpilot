@@ -1,3 +1,4 @@
+import { OffersSummary } from '@/components/offers';
 import { CollectionPanel } from '@/components/collection-panel';
 import { getTranslations } from 'next-intl/server';
 import {
@@ -43,6 +44,7 @@ export default async function Dashboard() {
         </div>
       </section>
       <CollectionPanel />
+      <OffersSummary />
       <section aria-labelledby="overview-heading" className="overview-section">
         <div className="section-title">
           <h2 id="overview-heading">{t('overview')}</h2>

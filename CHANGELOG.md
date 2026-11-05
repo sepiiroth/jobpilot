@@ -38,3 +38,8 @@
 - Collect and normalize authorized Adzuna, Greenhouse, Lever and Ashby APIs with anonymized fixture tests.
 - Deduplicate offers, preserve ignored matches and isolate embeddings by user, model and content.
 - Add protected collection endpoints, concurrent-start protection, SSE and French dashboard progress reports.
+
+- Add phase 8 hard filtering, private-vector similarity and bounded AI scoring per search.
+- Persist scoring attempt budgets across retries and fence stale results after profile edits.
+- Add French offers filters, detailed analyses, interesting/ignored actions and dashboard summaries.
+- Verify durable ignored states, tenant ownership, call limits and matching coverage thresholds.
