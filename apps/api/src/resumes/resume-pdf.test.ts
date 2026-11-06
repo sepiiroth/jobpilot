@@ -44,3 +44,22 @@ it('wraps long resumes without dropping their final entries', async () => {
   expect(result.text).toContain('Synthetic employer 29');
   expect(result.text).toContain('Projet de démonstration');
 });
+it('uses English section labels and present-tense date labels without translating source facts', async () => {
+  const data = structuredClone(syntheticResume);
+  delete data.work[0]!.endDate;
+  const result = await extractText(
+    new Uint8Array(await renderResumePdf(data, 'en')),
+    { mergePages: true },
+  );
+  for (const label of [
+    'Profile',
+    'Experience',
+    'Education',
+    'Skills',
+    'Languages',
+    'Projects',
+    'Present',
+    'Entreprise Exemple',
+  ])
+    expect(result.text).toContain(label);
+});

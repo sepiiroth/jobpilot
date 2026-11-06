@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import {
   useForm,
@@ -140,16 +140,20 @@ export function ResumesPage() {
     </section>
   );
 }
-function ResumeEditor({
+export function ResumeEditor({
   record,
   initial,
   onSaved,
   onDeleted,
+  saveDraft,
+  onDirtyChange,
 }: {
   record: ResumeRecord | null;
   initial: ResumeInput | null;
   onSaved: (v: ResumeRecord) => void;
   onDeleted: () => void;
+  saveDraft?: (value: ResumeInput) => Promise<ResumeRecord>;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const t = useTranslations('Profile');
   const ai = useTranslations('AI');
@@ -165,6 +169,9 @@ function ResumeEditor({
         }
       : (initial ?? empty()),
   });
+  useEffect(() => {
+    onDirtyChange?.(form.formState.isDirty);
+  }, [form.formState.isDirty, onDirtyChange]);
   const work = useFieldArray({ control: form.control, name: 'data.work' });
   const education = useFieldArray({
     control: form.control,
@@ -187,7 +194,8 @@ function ResumeEditor({
   const [preview, setPreview] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const mutation = useMutation({
-    mutationFn: (value: ResumeInput) => apiClient.saveResume(record?.id, value),
+    mutationFn: (value: ResumeInput) =>
+      saveDraft ? saveDraft(value) : apiClient.saveResume(record?.id, value),
     onSuccess: async (value) => {
       form.reset({
         title: value.title,
@@ -235,7 +243,9 @@ function ResumeEditor({
   return (
     <div className="profile-editor">
       <div className="profile-toolbar">
-        <h2>{record ? record.title : t('newResume')}</h2>
+        <h2>
+          {saveDraft ? t('edit') : record ? record.title : t('newResume')}
+        </h2>
         <Button variant="outline" onClick={() => setPreview(!preview)}>
           {preview ? t('edit') : t('preview')}
         </Button>
@@ -262,7 +272,7 @@ function ResumeEditor({
           <fieldset>
             <legend>{t('identity')}</legend>
             <div className="profile-grid">
-              {field('title', 'resumeName')}
+              {!saveDraft && field('title', 'resumeName')}
               {field('data.basics.name', 'fullName')}
               {field('data.basics.label', 'headline', true)}
               {field('data.basics.email', 'email', true)}
@@ -270,10 +280,12 @@ function ResumeEditor({
               {field('data.basics.url', 'website', true)}
             </div>
             {field('data.basics.summary', 'summary', true, true)}
-            <label className="profile-check">
-              <input type="checkbox" {...form.register('isArchived')} />
-              {t('archived')}
-            </label>
+            {!saveDraft && (
+              <label className="profile-check">
+                <input type="checkbox" {...form.register('isArchived')} />
+                {t('archived')}
+              </label>
+            )}
           </fieldset>
           <fieldset>
             <legend>{t('location')}</legend>

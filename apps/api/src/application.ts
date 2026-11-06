@@ -1,3 +1,6 @@
+import { GenerationController } from './generation/generation.controller.ts';
+import { GenerationService } from './generation/generation.service.ts';
+import { GenerationRepository } from './generation/generation.repository.ts';
 import { JobsController, JobsService } from './jobs/jobs.ts';
 import { JobsRepository } from './jobs/jobs.repository.ts';
 import { BullModule, getQueueToken } from '@nestjs/bullmq';
@@ -222,6 +225,19 @@ export async function createApplication(
       },
     ],
   })(JobsModule);
+  class GenerationModule {}
+  Module({
+    imports: [llmModule],
+    controllers: [GenerationController],
+    providers: [
+      {
+        provide: GenerationService,
+        useFactory: (llm: LlmService) =>
+          new GenerationService(new GenerationRepository(db), llm),
+        inject: [LlmService],
+      },
+    ],
+  })(GenerationModule);
   class AppModule {}
   Module({
     imports: [
@@ -247,6 +263,7 @@ export async function createApplication(
       LlmHttpModule,
       CollectionsModule,
       JobsModule,
+      GenerationModule,
     ],
     providers: [
       { provide: Reflector, useValue: new Reflector() },

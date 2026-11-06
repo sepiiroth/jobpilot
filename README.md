@@ -73,3 +73,7 @@ See [scoring and offers](docs/scoring-and-offers.md) for the three-stage pipelin
 ## Phase 9: email alerts
 
 See [read-only email alerts](docs/email-alerts.md) for IMAP setup, authorized senders, private offers, UID tracking, TLS/network policy and verification with temporary Dovecot and Mailpit servers.
+
+## Tailored documents
+
+From an offer, generate and edit private resume and cover-letter drafts with tone, length and language controls. Master resumes stay unchanged. Flagged facts and rewritten text require explicit review before PDF export or letter copying. Each generated version displays its tokens and estimated cost. See [the generation guide](docs/generated-documents.md) for integrity rules, version history and setup.

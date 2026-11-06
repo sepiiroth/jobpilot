@@ -1,4 +1,6 @@
 'use client';
+import { GeneratedDocuments } from './generation/documents';
+
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -346,6 +348,7 @@ export function OfferDetail({ id }: { id: string }) {
           <p>{t('state_' + value.state)}</p>
         )}
       </section>
+      <GeneratedDocuments matchId={value.id} />
       <section className="profile-section">
         <h2>{t('descriptionHeading')}</h2>
         <p className="job-description">{value.description}</p>

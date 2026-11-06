@@ -48,3 +48,7 @@
 - Extract grounded vacancies through the configured small model with bounded MIME input and no automatic UID reprocessing.
 - Keep email-derived offers private, preserve ignored states and include email state in account export/deletion.
 - Validate real IMAP flags, certificate checks and the BullMQ pipeline with temporary Dovecot and Mailpit services.
+
+- Add phase 10 private tailored resume and cover-letter drafts with immutable versions, cursor history and measured per-call costs.
+- Add conservative integrity review for facts and free prose, fingerprint-bound approval, PDF exports and explicit letter copying.
+- Add ownership, CSRF, master-preservation, stale-review and PDF extraction tests with enforced integrity coverage.

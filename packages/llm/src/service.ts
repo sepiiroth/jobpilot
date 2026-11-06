@@ -1,3 +1,4 @@
+import type { GenerationCost } from '@jobpilot/shared/generation';
 import { z } from 'zod';
 import { CryptoService } from '@jobpilot/shared/crypto';
 import type { LlmEnvironment } from './config.ts';
@@ -60,6 +61,7 @@ export class LlmService {
     prompt: Prompt,
     schema: z.ZodType<T>,
     operation: 'generation' | 'scoring' = 'generation',
+    measured?: (cost: GenerationCost) => void,
   ): Promise<T> {
     const selected = await this.selection(userId, operation);
     const schemaBytes = Buffer.byteLength(
@@ -85,6 +87,7 @@ export class LlmService {
       },
       'text',
       operation === 'scoring' ? 0 : this.config.LLM_MAX_RETRIES,
+      measured,
     );
   }
   async generateText(
@@ -147,6 +150,7 @@ export class LlmService {
     run: (provider: LlmProvider, signal: AbortSignal) => Promise<LlmResult<T>>,
     operation: 'text' | 'embedding',
     maxRetries = this.config.LLM_MAX_RETRIES,
+    measured?: (cost: GenerationCost) => void,
   ): Promise<T> {
     const provider = this.factory(selected, operation);
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -184,6 +188,15 @@ export class LlmService {
               1_000_000
             : null;
         await this.repository.settle(userId, record.id, result.usage, cost);
+        measured?.({
+          usageId: record.id,
+          uncertainAttempts: attempt,
+          provider: selected.provider,
+          model: selected.model,
+          tokensIn: result.usage.tokensIn,
+          tokensOut: result.usage.tokensOut,
+          costUsd: cost,
+        });
         return result.value;
       } catch (error) {
         await this.repository.settle(userId, record.id, null, null);

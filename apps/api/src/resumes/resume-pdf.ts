@@ -39,8 +39,13 @@ const styles = StyleSheet.create({
 function text(value: string | undefined, strong = false) {
   return value ? h(Text, { style: strong ? styles.strong : {} }, value) : null;
 }
-function dates(start?: string, end?: string) {
-  return [start, end || (start ? 'En cours' : '')].filter(Boolean).join(' - ');
+function dates(start?: string, end?: string, language: 'fr' | 'en' = 'fr') {
+  return [
+    start,
+    end || (start ? (language === 'fr' ? 'En cours' : 'Present') : ''),
+  ]
+    .filter(Boolean)
+    .join(' - ');
 }
 function section(title: string, content: ReturnType<typeof h>[]) {
   return content.length
@@ -52,13 +57,16 @@ function section(title: string, content: ReturnType<typeof h>[]) {
       )
     : null;
 }
-export async function renderResumePdf(input: Resume) {
+export async function renderResumePdf(
+  input: Resume,
+  language: 'fr' | 'en' = 'fr',
+) {
   const r = resumeSchema.parse(input);
   const basics = r.basics;
   return renderToBuffer(
     h(
       Document,
-      { title: basics.name, author: basics.name, language: 'fr' },
+      { title: basics.name, author: basics.name, language },
       h(
         Page,
         { size: 'A4', style: styles.page },
@@ -86,16 +94,18 @@ export async function renderResumePdf(input: Resume) {
         ),
         ...basics.profiles.map((p) => text(`${p.network} : ${p.url}`)),
         basics.summary
-          ? section('Profil', [h(Text, {}, basics.summary)])
+          ? section(language === 'fr' ? 'Profil' : 'Profile', [
+              h(Text, {}, basics.summary),
+            ])
           : null,
         section(
-          'Expériences',
+          language === 'fr' ? 'Expériences' : 'Experience',
           r.work.map((w) =>
             h(
               View,
               { style: styles.entry },
               text(`${w.position} | ${w.name}`, true),
-              text(dates(w.startDate, w.endDate)),
+              text(dates(w.startDate, w.endDate, language)),
               text(w.url),
               text(w.summary),
               ...w.highlights.map((v) => text(`- ${v}`)),
@@ -103,19 +113,19 @@ export async function renderResumePdf(input: Resume) {
           ),
         ),
         section(
-          'Formation',
+          language === 'fr' ? 'Formation' : 'Education',
           r.education.map((e) =>
             h(
               View,
               { style: styles.entry },
               text(`${e.studyType} ${e.area} | ${e.institution}`, true),
-              text(dates(e.startDate, e.endDate)),
+              text(dates(e.startDate, e.endDate, language)),
               ...e.courses.map((v) => text(`- ${v}`)),
             ),
           ),
         ),
         section(
-          'Compétences',
+          language === 'fr' ? 'Compétences' : 'Skills',
           r.skills.map((s) =>
             h(
               Text,
@@ -127,11 +137,11 @@ export async function renderResumePdf(input: Resume) {
           ),
         ),
         section(
-          'Langues',
+          language === 'fr' ? 'Langues' : 'Languages',
           r.languages.map((l) => h(Text, {}, `${l.language} - ${l.fluency}`)),
         ),
         section(
-          'Projets',
+          language === 'fr' ? 'Projets' : 'Projects',
           r.projects.map((p) =>
             h(
               View,

@@ -6,6 +6,7 @@ export default defineConfig({
       provider: 'v8',
       include: [
         'src/auth/**/*.ts',
+        '../../packages/llm/src/integrity.ts',
         'src/crypto/**/*.ts',
         '../../packages/shared/src/crypto.ts',
         '../../packages/shared/src/matching.ts',
@@ -17,6 +18,12 @@ export default defineConfig({
       allowExternal: true,
       exclude: ['src/**/*.test.ts'],
       thresholds: {
+        '../../packages/llm/src/integrity.ts': {
+          lines: 80,
+          statements: 80,
+          functions: 80,
+          branches: 80,
+        },
         lines: 80,
         statements: 80,
         functions: 80,

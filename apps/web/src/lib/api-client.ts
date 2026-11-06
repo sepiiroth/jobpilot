@@ -1,4 +1,13 @@
 import {
+  documentHistorySchema,
+  generationInputSchema,
+  documentEditSchema,
+  documentReviewSchema,
+  documentDetailSchema,
+  type DocumentContent,
+  type GenerationParams,
+} from '@jobpilot/shared/generation';
+import {
   jobQuerySchema,
   jobRecordSchema,
   jobsPageSchema,
@@ -89,7 +98,9 @@ export function createApiClient(fetcher: typeof fetch = fetch) {
         },
         body: payload instanceof Blob ? payload : JSON.stringify(payload),
         signal: AbortSignal.timeout(
-          path.startsWith('/resumes') ? 210000 : 15000,
+          path.startsWith('/resumes') || /\/jobs\/[^/]+\/documents$/.test(path)
+            ? 210000
+            : 15000,
         ),
       });
     try {
@@ -103,6 +114,51 @@ export function createApiClient(fetcher: typeof fetch = fetch) {
     }
   }
   return {
+    documents: async (matchId: string, cursor?: string) =>
+      documentHistorySchema.parse(
+        await send(
+          '/jobs/' +
+            matchId +
+            '/documents' +
+            (cursor ? '?cursor=' + cursor : ''),
+        ),
+      ),
+    generateDocument: async (
+      matchId: string,
+      resumeId: string,
+      kind: 'resume' | 'cover_letter',
+      params: GenerationParams,
+    ) =>
+      documentDetailSchema.parse(
+        await write(
+          '/jobs/' + matchId + '/documents',
+          generationInputSchema.parse({ resumeId, kind, params }),
+        ),
+      ),
+    editDocument: async (id: string, content: DocumentContent) =>
+      documentDetailSchema.parse(
+        await write(
+          '/documents/' + id + '/versions',
+          documentEditSchema.parse({ content }),
+        ),
+      ),
+    reviewDocument: async (
+      id: string,
+      sourceFingerprint: string,
+      issueIds: string[],
+    ) =>
+      documentDetailSchema.parse(
+        await write(
+          '/documents/' + id + '/review',
+          documentReviewSchema.parse({ sourceFingerprint, issueIds }),
+        ),
+      ),
+    documentPdf: async (id: string) =>
+      (await send('/documents/' + id + '/pdf', {}, true)) as Blob,
+    documentText: async (id: string) =>
+      z
+        .object({ text: z.string() })
+        .parse(await send('/documents/' + id + '/text')),
     jobs: async (query: JobQuery) => {
       const values = jobQuerySchema.parse(query);
       const params = new URLSearchParams(

@@ -17,3 +17,5 @@ export type {
 } from './provider.ts';
 export { jobScoringPrompt } from './prompts/job-scoring-v1.ts';
 export { emailAlertPrompt } from './prompts/email-alert-v1.ts';
+export { checkIntegrity, fingerprint } from './integrity.ts';
+export { tailoredDocumentPrompt } from './prompts/tailored-document-v1.ts';
