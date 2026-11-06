@@ -1,3 +1,4 @@
+import { ApiError } from '../common/errors.ts';
 import { Prisma, type PrismaClient } from '@jobpilot/db';
 import { jobRecordSchema, type JobQuery } from '@jobpilot/shared/jobs';
 const includeFor = (userId: string) => ({
@@ -108,7 +109,8 @@ export class JobsRepository {
   async status(
     userId: string,
     id: string,
-    status: 'new' | 'interesting' | 'ignored',
+    status: 'new' | 'interesting' | 'ignored' | 'applied',
+    appliedAt?: string,
   ) {
     const row = await this.db.searchMatch.findFirst({
       where: { id, userId, passed: true },
@@ -116,8 +118,49 @@ export class JobsRepository {
     });
     if (!row) return null;
     const updated = await this.db.$transaction(async (tx) => {
+      if (status === 'applied')
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${'applications:' + userId},0))`;
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${'offer-status:' + userId + ':' + row.offer.dedupKey},0))`;
-      return tx.userJobMatch.updateMany({
+      if (status === 'applied') {
+        const existing = await tx.application.findFirst({
+          where: {
+            userId,
+            jobOffer: {
+              OR: [
+                { id: row.jobOfferId },
+                {
+                  dedupKey: row.offer.dedupKey,
+                  fetchedAt: { gte: new Date(Date.now() - 30 * 86400000) },
+                },
+                { url: row.offer.url },
+              ],
+            },
+          },
+        });
+        if (!existing)
+          await tx.application.create({
+            data: {
+              userId,
+              jobOfferId: row.jobOfferId,
+              status: 'applied',
+              appliedAt: appliedAt
+                ? new Date(appliedAt + 'T00:00:00Z')
+                : new Date(),
+            },
+          });
+        else if (existing.status === 'to_apply')
+          await tx.application.update({
+            where: { id: existing.id, userId },
+            data: {
+              status: 'applied',
+              appliedAt:
+                existing.appliedAt ??
+                (appliedAt ? new Date(appliedAt + 'T00:00:00Z') : new Date()),
+              revision: { increment: 1 },
+            },
+          });
+      }
+      const flags = await tx.userJobMatch.updateMany({
         where: {
           userId,
           OR: [
@@ -133,6 +176,8 @@ export class JobsRepository {
         },
         data: { status },
       });
+      if (!flags.count) throw new ApiError(404, 'NOT_FOUND', 'Job not found');
+      return flags;
     });
     return updated.count ? this.get(userId, id) : null;
   }

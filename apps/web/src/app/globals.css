@@ -1348,3 +1348,152 @@ a {
 .generation-panel select {
   max-width: 100%;
 }
+.applications-page {
+  min-width: 0;
+}
+.application-board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(17rem, 1fr));
+  gap: 1rem;
+  overflow-x: auto;
+  padding: 0.25rem 0.25rem 1rem;
+  max-width: 100%;
+}
+.application-column {
+  min-height: 24rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--card);
+}
+.application-column.is-drop-target {
+  outline: 3px solid var(--ring);
+  outline-offset: -3px;
+}
+.application-column > h2 {
+  font-weight: 650;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.application-column > h2 span {
+  font-size: 0.85rem;
+  color: var(--muted-foreground);
+}
+.application-cards {
+  display: grid;
+  gap: 1rem;
+}
+.application-card {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--background);
+  display: grid;
+  gap: 0.6rem;
+  overflow-wrap: anywhere;
+}
+.application-card.is-dragging {
+  opacity: 0.75;
+}
+.application-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.application-card h3 {
+  font-weight: 600;
+}
+.application-drag-handle {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  cursor: grab;
+  touch-action: none;
+  font-size: 1.4rem;
+}
+.application-drag-handle:focus-visible,
+.application-column > h2:focus {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+.application-card select,
+.application-editor select,
+.application-editor input,
+.application-editor textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.6rem;
+  background: var(--background);
+  color: var(--foreground);
+}
+.application-status-label {
+  font-size: 0.85rem;
+  color: var(--muted-foreground);
+}
+.application-due {
+  justify-self: start;
+  color: #9a3412;
+  background: #ffedd5;
+  border: 1px solid #fdba74;
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.dark .application-due {
+  color: #fed7aa;
+  background: #431407;
+  border-color: #9a3412;
+}
+.application-dialog {
+  width: min(94vw, 64rem);
+  max-width: 64rem;
+  max-height: 90svh;
+  overflow-y: auto;
+}
+.application-editor {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+.application-editor form {
+  display: grid;
+  gap: 1rem;
+}
+.application-documents {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--border);
+  padding: 1rem;
+  border-radius: 0.75rem;
+}
+.application-editor details {
+  padding-block: 0.5rem;
+}
+.application-track h2 {
+  margin-bottom: 0.5rem;
+}
+.application-track .profile-help {
+  margin-bottom: 1rem;
+}
+.application-dialog-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  font-size: 1.5rem;
+}
+.application-dialog > [data-slot='dialog-header'] {
+  padding-right: 3rem;
+}

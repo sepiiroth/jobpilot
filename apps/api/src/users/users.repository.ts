@@ -76,7 +76,7 @@ export class UsersRepository {
           }),
         ]);
         return {
-          schemaVersion: 4,
+          schemaVersion: 5,
           exportedAt: new Date().toISOString(),
           user,
           resumes,

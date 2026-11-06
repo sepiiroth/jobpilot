@@ -295,10 +295,10 @@ export class CollectionRepository {
         update: {},
       });
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${'offer-status:' + userId + ':' + dedupKey},0))`;
-      const ignored = await tx.userJobMatch.findFirst({
+      const preservedMatch = await tx.userJobMatch.findFirst({
         where: {
           userId,
-          status: 'ignored',
+          status: { in: ['ignored', 'applied'] },
           jobOffer: {
             OR: [
               {
@@ -316,7 +316,7 @@ export class CollectionRepository {
           jobOfferId: existing.id,
           searchId: step.searchId,
           hardFilterPassed: false,
-          status: ignored ? 'ignored' : 'new',
+          status: preservedMatch?.status ?? 'new',
         },
         skipDuplicates: true,
       });

@@ -277,6 +277,7 @@ model GeneratedDocument {
 }
 
 model Application {
+  revision Int @default(1)
   letterDocument GeneratedDocument? @relation("Application_letterDocument", fields: [userId, letterDocId], references: [userId, id], onDelete: NoAction)
 
   resumeDocument GeneratedDocument? @relation("Application_resumeDocument", fields: [userId, resumeDocId], references: [userId, id], onDelete: NoAction)

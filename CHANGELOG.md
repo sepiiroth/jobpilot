@@ -52,3 +52,7 @@
 - Add phase 10 private tailored resume and cover-letter drafts with immutable versions, cursor history and measured per-call costs.
 - Add conservative integrity review for facts and free prose, fingerprint-bound approval, PDF exports and explicit letter copying.
 - Add ownership, CSRF, master-preservation, stale-review and PDF extraction tests with enforced integrity coverage.
+
+- Add phase 11 private application tracking with idempotent submitted-offer creation, revision-protected edits, notes and local calendar follow-up reminders.
+- Add a French accessible dnd-kit board with keyboard/pointer dragging and native status selectors.
+- Link reviewed immutable document versions, retain tracking after search deletion, and export application revisions in schema version 5.

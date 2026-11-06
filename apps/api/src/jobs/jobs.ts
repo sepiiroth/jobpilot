@@ -23,6 +23,7 @@ export class JobsService {
       userId,
       id,
       jobStatusInputSchema.parse(input).status,
+      jobStatusInputSchema.parse(input).appliedAt,
     );
     if (!row) throw new ApiError(404, 'NOT_FOUND', 'Job not found');
     return row;

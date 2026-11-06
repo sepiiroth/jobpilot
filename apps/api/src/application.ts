@@ -1,3 +1,8 @@
+import {
+  ApplicationsController,
+  ApplicationsService,
+} from './applications/applications.ts';
+import { ApplicationsRepository } from './applications/applications.repository.ts';
 import { GenerationController } from './generation/generation.controller.ts';
 import { GenerationService } from './generation/generation.service.ts';
 import { GenerationRepository } from './generation/generation.repository.ts';
@@ -238,6 +243,17 @@ export async function createApplication(
       },
     ],
   })(GenerationModule);
+  class ApplicationsModule {}
+  Module({
+    controllers: [ApplicationsController],
+    providers: [
+      {
+        provide: ApplicationsService,
+        useFactory: () =>
+          new ApplicationsService(new ApplicationsRepository(db)),
+      },
+    ],
+  })(ApplicationsModule);
   class AppModule {}
   Module({
     imports: [
@@ -263,6 +279,7 @@ export async function createApplication(
       LlmHttpModule,
       CollectionsModule,
       JobsModule,
+      ApplicationsModule,
       GenerationModule,
     ],
     providers: [

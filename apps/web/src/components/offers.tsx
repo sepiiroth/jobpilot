@@ -1,4 +1,5 @@
 'use client';
+import { TrackApplication } from './applications/track-application';
 import { GeneratedDocuments } from './generation/documents';
 
 import { useState } from 'react';
@@ -213,7 +214,7 @@ export function OfferDetail({ id }: { id: string }) {
     queryFn: () => apiClient.job(id),
   });
   const update = useMutation({
-    mutationFn: (status: 'new' | 'interesting' | 'ignored') =>
+    mutationFn: (status: 'new' | 'interesting' | 'ignored' | 'applied') =>
       apiClient.jobStatus(id, status),
     onSuccess: async (value) => {
       setError('');
@@ -348,6 +349,10 @@ export function OfferDetail({ id }: { id: string }) {
           <p>{t('state_' + value.state)}</p>
         )}
       </section>
+      <TrackApplication
+        matchId={value.id}
+        applied={value.status === 'applied'}
+      />
       <GeneratedDocuments matchId={value.id} />
       <section className="profile-section">
         <h2>{t('descriptionHeading')}</h2>

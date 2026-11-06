@@ -1,4 +1,15 @@
 import {
+  applicationPageSchema,
+  applicationRecordSchema,
+  applicationCreateSchema,
+  applicationUpdateSchema,
+  applicationMoveSchema,
+  applicationDocumentPageSchema,
+  localCalendarDate,
+  type ApplicationFields,
+  type ApplicationStatus,
+} from '@jobpilot/shared/applications';
+import {
   documentHistorySchema,
   generationInputSchema,
   documentEditSchema,
@@ -159,6 +170,62 @@ export function createApiClient(fetcher: typeof fetch = fetch) {
       z
         .object({ text: z.string() })
         .parse(await send('/documents/' + id + '/text')),
+    applications: async (cursor?: string) =>
+      applicationPageSchema.parse(
+        await send('/applications' + (cursor ? '?cursor=' + cursor : '')),
+      ),
+    application: async (id: string) =>
+      applicationRecordSchema.parse(await send('/applications/' + id)),
+    createApplication: async (
+      matchId: string,
+      status: ApplicationStatus = 'to_apply',
+    ) =>
+      applicationRecordSchema.parse(
+        await write(
+          '/jobs/' + matchId + '/application',
+          applicationCreateSchema.parse({
+            status,
+            appliedAt: status === 'to_apply' ? null : localCalendarDate(),
+          }),
+        ),
+      ),
+    updateApplication: async (
+      id: string,
+      revision: number,
+      fields: ApplicationFields,
+    ) =>
+      applicationRecordSchema.parse(
+        await write(
+          '/applications/' + id,
+          applicationUpdateSchema.parse({ revision, fields }),
+        ),
+      ),
+    moveApplication: async (
+      id: string,
+      revision: number,
+      status: ApplicationStatus,
+    ) =>
+      applicationRecordSchema.parse(
+        await write(
+          '/applications/' + id + '/status',
+          applicationMoveSchema.parse({
+            revision,
+            status,
+            appliedAt: localCalendarDate(),
+          }),
+        ),
+      ),
+    applicationDocuments: async (id: string, cursor?: string) =>
+      applicationDocumentPageSchema.parse(
+        await send(
+          '/applications/' +
+            id +
+            '/documents' +
+            (cursor ? '?cursor=' + cursor : ''),
+        ),
+      ),
+    document: async (id: string) =>
+      documentDetailSchema.parse(await send('/documents/' + id)),
     jobs: async (query: JobQuery) => {
       const values = jobQuerySchema.parse(query);
       const params = new URLSearchParams(
@@ -167,11 +234,17 @@ export function createApiClient(fetcher: typeof fetch = fetch) {
       return jobsPageSchema.parse(await send('/jobs?' + params));
     },
     job: async (id: string) => jobRecordSchema.parse(await send('/jobs/' + id)),
-    jobStatus: async (id: string, status: 'new' | 'interesting' | 'ignored') =>
+    jobStatus: async (
+      id: string,
+      status: 'new' | 'interesting' | 'ignored' | 'applied',
+    ) =>
       jobRecordSchema.parse(
         await write(
           '/jobs/' + id + '/status',
-          jobStatusInputSchema.parse({ status }),
+          jobStatusInputSchema.parse({
+            status,
+            ...(status === 'applied' ? { appliedAt: localCalendarDate() } : {}),
+          }),
         ),
       ),
     jobsSummary: async () =>

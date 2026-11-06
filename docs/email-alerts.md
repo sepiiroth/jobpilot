@@ -50,7 +50,7 @@ The versioned extraction prompt encloses all message text and links in randomize
 
 Email-derived offers belong to their user through `privateUserId`. They never merge private email descriptions or URLs into the shared public offer catalog. Email deduplication operates within the owner's private catalog. Status changes and ignored-state inheritance remain scoped to the same user and recognized duplicate identities, so a private copy does not resurrect a previously ignored known offer.
 
-Only normalized offers, hashed account/sender identifiers, UID metadata and safe error codes are retained. Full raw messages, attachment data and passwords are not stored in receipts or queue payloads. Queue jobs still contain only owned record IDs. Export schema version 4 includes owned email mailbox cursors and receipt data. Account deletion cascades private offers and email state. No other user's cached messages or vectors are reused.
+Only normalized offers, hashed account/sender identifiers, UID metadata and safe error codes are retained. Full raw messages, attachment data and passwords are not stored in receipts or queue payloads. Queue jobs still contain only owned record IDs. Export schema version 5 includes owned email mailbox cursors and receipt data. Account deletion cascades private offers and email state. No other user's cached messages or vectors are reused.
 
 ## Verification
 

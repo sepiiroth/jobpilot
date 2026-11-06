@@ -59,7 +59,7 @@ beforeAll(async () => {
       Wait.forLogMessage('database system is ready to accept connections', 2),
     )
     .start();
-  const url = `postgresql://jobpilot:${password}@${pg.getHost()}:${pg.getMappedPort(5432)}/jobpilot`;
+  const url = `postgresql://jobpilot:${password}@${pg.getHost() === 'localhost' ? '127.0.0.1' : pg.getHost()}:${pg.getMappedPort(5432)}/jobpilot`;
   execFileSync(
     process.execPath,
     ['node_modules/prisma/build/index.js', 'migrate', 'deploy'],

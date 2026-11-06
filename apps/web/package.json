@@ -19,11 +19,13 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "lighthouse": "13.6.0",
+    "shadcn": "4.23.0",
     "tailwindcss": "4.3.4",
-    "vitest": "5.1.0",
-    "shadcn": "4.23.0"
+    "vitest": "5.1.0"
   },
   "dependencies": {
+    "@dnd-kit/dom": "0.5.3",
+    "@dnd-kit/react": "0.5.3",
     "@hookform/resolvers": "7.0.3",
     "@jobpilot/shared": "workspace:*",
     "@tanstack/react-query": "5.106.1",

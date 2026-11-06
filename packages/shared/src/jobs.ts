@@ -36,7 +36,8 @@ export const jobQuerySchema = z
   })
   .refine((v) => !v.from || !v.to || v.from <= v.to, 'Invalid date range');
 export const jobStatusInputSchema = z.strictObject({
-  status: z.enum(['new', 'interesting', 'ignored']),
+  status: z.enum(['new', 'interesting', 'ignored', 'applied']),
+  appliedAt: z.iso.date().optional(),
 });
 export const jobRecordSchema = z.object({
   id: z.uuid(),

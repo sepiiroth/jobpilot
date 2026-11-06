@@ -77,3 +77,7 @@ See [read-only email alerts](docs/email-alerts.md) for IMAP setup, authorized se
 ## Tailored documents
 
 From an offer, generate and edit private resume and cover-letter drafts with tone, length and language controls. Master resumes stay unchanged. Flagged facts and rewritten text require explicit review before PDF export or letter copying. Each generated version displays its tokens and estimated cost. See [the generation guide](docs/generated-documents.md) for integrity rules, version history and setup.
+
+## Application tracking
+
+Track offers from the offer detail page, then manage notes, calendar dates and the exact resume/letter versions used in the **Candidatures** board. Cards support pointer dragging, keyboard dragging and a native status selector. Follow-up dates display an overdue badge without sending notifications. See [the application tracking guide](docs/application-tracking.md) for behavior, privacy and verification.

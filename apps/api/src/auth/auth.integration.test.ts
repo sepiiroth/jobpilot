@@ -170,9 +170,9 @@ beforeAll(async () => {
     .withExposedPorts(6379)
     .withWaitStrategy(Wait.forLogMessage('Ready to accept connections'))
     .start();
-  const url = `postgresql://jobpilot:${infrastructurePassword}@${postgres.getHost()}:${postgres.getMappedPort(5432)}/jobpilot`;
+  const url = `postgresql://jobpilot:${infrastructurePassword}@${postgres.getHost() === 'localhost' ? '127.0.0.1' : postgres.getHost()}:${postgres.getMappedPort(5432)}/jobpilot`;
   databaseUrl = url;
-  const valkeyUrl = `redis://:${infrastructurePassword}@${valkey.getHost()}:${valkey.getMappedPort(6379)}`;
+  const valkeyUrl = `redis://:${infrastructurePassword}@${valkey.getHost() === 'localhost' ? '127.0.0.1' : valkey.getHost()}:${valkey.getMappedPort(6379)}`;
   execFileSync(
     process.execPath,
     ['node_modules/prisma/build/index.js', 'migrate', 'deploy'],
@@ -1328,7 +1328,7 @@ it('scores only the best N per search, replays safely and preserves ignored matc
     .send({ status: 'ignored' })
     .expect(403);
   await profileWrite(owner, '/jobs/' + id + '/status', {
-    status: 'applied',
+    status: 'not_a_status',
   }).expect(400);
   await request(server)
     .get('/jobs?minScore=101')
@@ -2066,4 +2066,578 @@ it('labels unpriced model calls as unknown instead of presenting free generation
   expect(
     await db.llmUsage.count({ where: { userId, purpose: 'tailored_resume' } }),
   ).toBe(2);
+});
+async function applicationContext() {
+  const context = await generationContext();
+  await db.userJobMatch.create({
+    data: {
+      userId,
+      jobOfferId: context.offer.id,
+      searchId: context.match.searchId,
+      hardFilterPassed: true,
+    },
+  });
+  return context;
+}
+it('atomically creates one application when marking an offer applied, and promotes a tracked draft without resetting later stages', async () => {
+  const { owner, match, offer } = await applicationContext();
+  await Promise.all(
+    [1, 2].map(() =>
+      profileWrite(owner, `/jobs/${match.id}/status`, {
+        status: 'applied',
+        appliedAt: '2026-11-06',
+      }).expect(200),
+    ),
+  );
+  expect(await db.application.count({ where: { userId } })).toBe(1);
+  let row = await db.application.findFirstOrThrow({ where: { userId } });
+  expect(row.status).toBe('applied');
+  expect(row.appliedAt?.toISOString().slice(0, 10)).toBe('2026-11-06');
+  expect(
+    (
+      await db.userJobMatch.findFirstOrThrow({
+        where: { userId, jobOfferId: offer.id },
+      })
+    ).status,
+  ).toBe('applied');
+  await profileWrite(owner, `/applications/${row.id}/status`, {
+    revision: row.revision,
+    status: 'interview',
+  }).expect(200);
+  await profileWrite(owner, `/jobs/${match.id}/status`, {
+    status: 'applied',
+    appliedAt: '2026-11-07',
+  }).expect(200);
+  row = await db.application.findFirstOrThrow({ where: { userId } });
+  expect(row.status).toBe('interview');
+  expect(row.appliedAt?.toISOString().slice(0, 10)).toBe('2026-11-06');
+  await db.application.update({
+    where: { id: row.id },
+    data: { status: 'to_apply', appliedAt: null, notes: 'Keep this note' },
+  });
+  await profileWrite(owner, `/jobs/${match.id}/status`, {
+    status: 'applied',
+    appliedAt: '2026-11-08',
+  }).expect(200);
+  row = await db.application.findFirstOrThrow({ where: { userId } });
+  expect(row).toMatchObject({ status: 'applied', notes: 'Keep this note' });
+  expect(row.appliedAt?.toISOString().slice(0, 10)).toBe('2026-11-08');
+});
+it('preserves application notes and dates through moves, rejects stale edits and retains independently ignored offer flags', async () => {
+  const { owner, match } = await applicationContext();
+  const responses = await Promise.all(
+    [1, 2].map(() =>
+      profileWrite(owner, `/jobs/${match.id}/application`, {}).expect(200),
+    ),
+  );
+  expect(responses[0]!.body.id).toBe(responses[1]!.body.id);
+  const row = responses[0]!.body as { id: string; revision: number };
+  const fields = {
+    status: 'applied',
+    appliedAt: '2026-11-01',
+    followUpAt: '2026-11-06',
+    notes: 'Private application note',
+    resumeDocId: null,
+    letterDocId: null,
+  };
+  const updated = await profileWrite(owner, `/applications/${row.id}`, {
+    revision: row.revision,
+    fields,
+  }).expect(200);
+  await profileWrite(owner, `/applications/${row.id}`, {
+    revision: row.revision,
+    fields: { ...fields, notes: 'Stale overwrite' },
+  }).expect(409);
+  const moved = await profileWrite(owner, `/applications/${row.id}/status`, {
+    revision: updated.body.revision,
+    status: 'interview',
+  }).expect(200);
+  expect(moved.body).toMatchObject({
+    notes: fields.notes,
+    appliedAt: fields.appliedAt,
+    followUpAt: fields.followUpAt,
+  });
+  await profileWrite(owner, `/jobs/${match.id}/status`, {
+    status: 'ignored',
+  }).expect(200);
+  await profileWrite(owner, `/applications/${row.id}`, {
+    revision: moved.body.revision,
+    fields: { ...fields, status: 'interview', notes: 'Edited note' },
+  }).expect(200);
+  expect(
+    (await db.userJobMatch.findFirstOrThrow({ where: { userId } })).status,
+  ).toBe('ignored');
+  expect(logs).not.toContain('Private application note');
+});
+it('attaches only owned reviewed documents of the right kind and retains the exact historical versions after source changes', async () => {
+  const { owner, resume, match } = await applicationContext();
+  const app = (
+    await profileWrite(owner, `/jobs/${match.id}/application`, {}).expect(200)
+  ).body as { id: string; revision: number };
+  const cv = documentDetailSchema.parse(
+    (
+      await profileWrite(owner, `/jobs/${match.id}/documents`, {
+        resumeId: resume.id,
+        kind: 'resume',
+        params: {},
+      }).expect(200)
+    ).body,
+  );
+  const letter = documentDetailSchema.parse(
+    (
+      await profileWrite(owner, `/jobs/${match.id}/documents`, {
+        resumeId: resume.id,
+        kind: 'cover_letter',
+        params: {},
+      }).expect(200)
+    ).body,
+  );
+  const fields = {
+    status: 'to_apply',
+    appliedAt: null,
+    followUpAt: null,
+    notes: null,
+    resumeDocId: cv.id,
+    letterDocId: letter.id,
+  };
+  await profileWrite(owner, `/applications/${app.id}`, {
+    revision: app.revision,
+    fields,
+  }).expect(409);
+  await profileWrite(owner, `/applications/${app.id}`, {
+    revision: app.revision,
+    fields: { ...fields, resumeDocId: letter.id, letterDocId: null },
+  }).expect(404);
+  await profileWrite(owner, `/documents/${letter.id}/review`, {
+    sourceFingerprint: letter.sourceFingerprint,
+    issueIds: letter.integrity.issues.map((i) => i.id),
+  }).expect(200);
+  const saved = await profileWrite(owner, `/applications/${app.id}`, {
+    revision: app.revision,
+    fields,
+  }).expect(200);
+  expect(saved.body).toMatchObject({
+    resumeDocId: cv.id,
+    letterDocId: letter.id,
+  });
+  const changed = structuredClone(syntheticResume);
+  changed.basics.name = 'Updated master';
+  await db.resume.update({ where: { id: resume.id }, data: { data: changed } });
+  await profileWrite(owner, `/applications/${app.id}/status`, {
+    revision: saved.body.revision,
+    status: 'applied',
+    appliedAt: '2026-11-06',
+  }).expect(200);
+  const options = await request(server)
+    .get(`/applications/${app.id}/documents`)
+    .set('Cookie', owner.cookie)
+    .expect(200);
+  expect(options.body.items).toHaveLength(2);
+  expect(
+    options.body.items.every(
+      (v: unknown) =>
+        typeof v === 'object' && v !== null && 'blocked' in v && v.blocked,
+    ),
+  ).toBe(true);
+  await request(server)
+    .get(`/documents/${letter.id}/pdf`)
+    .set('Cookie', owner.cookie)
+    .expect(409);
+  await db.search.delete({ where: { id: match.searchId } });
+  const retained = await request(server)
+    .get(`/applications/${app.id}`)
+    .set('Cookie', owner.cookie)
+    .expect(200);
+  expect(retained.body.matchId).toBeNull();
+  expect(retained.body).toMatchObject({
+    resumeDocId: cv.id,
+    letterDocId: letter.id,
+    title: 'TypeScript engineer',
+  });
+});
+it('isolates applications and document choices, enforces CSRF, exports tracking data and cascades account deletion', async () => {
+  const { owner, resume, match } = await applicationContext();
+  const cv = documentDetailSchema.parse(
+    (
+      await profileWrite(owner, `/jobs/${match.id}/documents`, {
+        resumeId: resume.id,
+        kind: 'resume',
+        params: {},
+      }).expect(200)
+    ).body,
+  );
+  const app = (
+    await profileWrite(owner, `/jobs/${match.id}/application`, {}).expect(200)
+  ).body as { id: string; revision: number };
+  const fields = {
+    status: 'to_apply',
+    appliedAt: null,
+    followUpAt: null,
+    notes: 'Owned note',
+    resumeDocId: cv.id,
+    letterDocId: null,
+  };
+  await profileWrite(owner, `/applications/${app.id}`, {
+    revision: app.revision,
+    fields,
+  }).expect(200);
+  const stranger = await browserAs(otherId);
+  for (const path of [
+    `/applications/${app.id}`,
+    `/applications/${app.id}/documents`,
+  ])
+    await request(server).get(path).set('Cookie', stranger.cookie).expect(404);
+  expect(
+    (
+      await request(server)
+        .get('/applications')
+        .set('Cookie', stranger.cookie)
+        .expect(200)
+    ).body.items,
+  ).toEqual([]);
+  await profileWrite(stranger, `/applications/${app.id}`, {
+    revision: 1,
+    fields,
+  }).expect(404);
+  await profileWrite(stranger, `/applications/${app.id}/status`, {
+    revision: 1,
+    status: 'applied',
+  }).expect(404);
+  await profileWrite(stranger, `/jobs/${match.id}/application`, {}).expect(404);
+  await request(server)
+    .post(`/applications/${app.id}/status`)
+    .set('Cookie', owner.cookie)
+    .send({ revision: 1, status: 'applied' })
+    .expect(403);
+  const exported = await request(server)
+    .get('/users/me/export')
+    .set('Cookie', owner.cookie)
+    .expect(200);
+  expect(exported.body.schemaVersion).toBe(5);
+  expect(exported.body.applications[0].resumeDocId).toBe(cv.id);
+  await request(server)
+    .delete('/users/me')
+    .set('Cookie', owner.cookie)
+    .set('X-CSRF-Token', owner.csrf)
+    .set('Origin', origin)
+    .send({ password })
+    .expect(200);
+  expect(await db.application.count({ where: { userId } })).toBe(0);
+  expect(await db.generatedDocument.count({ where: { userId } })).toBe(0);
+});
+it('reuses a tracked application across known private and public duplicates and permits their owned document versions', async () => {
+  const { owner, match, offer, resume } = await applicationContext();
+  const first = (
+    await profileWrite(owner, `/jobs/${match.id}/application`, {}).expect(200)
+  ).body as { id: string; revision: number };
+  const copy = await db.jobOffer.create({
+    data: {
+      sourceId: 'email',
+      externalId: 'private-copy',
+      privateUserId: userId,
+      dedupKey: offer.dedupKey,
+      url: offer.url,
+      title: offer.title,
+      company: offer.company,
+      location: offer.location as Prisma.InputJsonValue,
+      description: offer.description,
+      remote: 'unknown',
+      contractType: 'unknown',
+    },
+  });
+  const duplicate = await db.searchMatch.create({
+    data: {
+      userId,
+      searchId: match.searchId,
+      runId: match.runId,
+      jobOfferId: copy.id,
+      inputKey: 'copy',
+      passed: true,
+      notes: [],
+    },
+  });
+  await db.userJobMatch.create({
+    data: {
+      userId,
+      jobOfferId: copy.id,
+      searchId: match.searchId,
+      hardFilterPassed: true,
+    },
+  });
+  expect(
+    (
+      await profileWrite(owner, `/jobs/${duplicate.id}/application`, {}).expect(
+        200,
+      )
+    ).body.id,
+  ).toBe(first.id);
+  await profileWrite(owner, `/jobs/${duplicate.id}/status`, {
+    status: 'applied',
+    appliedAt: '2026-11-06',
+  }).expect(200);
+  expect(await db.application.count({ where: { userId } })).toBe(1);
+  const cv = documentDetailSchema.parse(
+    (
+      await profileWrite(owner, `/jobs/${duplicate.id}/documents`, {
+        resumeId: resume.id,
+        kind: 'resume',
+        params: {},
+      }).expect(200)
+    ).body,
+  );
+  const current = await db.application.findUniqueOrThrow({
+    where: { id: first.id },
+  });
+  await profileWrite(owner, `/applications/${first.id}`, {
+    revision: current.revision,
+    fields: {
+      status: 'applied',
+      appliedAt: '2026-11-06',
+      followUpAt: null,
+      notes: null,
+      resumeDocId: cv.id,
+      letterDocId: null,
+    },
+  }).expect(200);
+  expect(
+    (
+      await request(server)
+        .get(`/applications/${first.id}/documents`)
+        .set('Cookie', owner.cookie)
+        .expect(200)
+    ).body.items[0].id,
+  ).toBe(cv.id);
+});
+it('paginates owned tracking records and rejects invalid or unrelated document choices', async () => {
+  const { owner, resume, match, offer } = await applicationContext();
+  const app = (
+    await profileWrite(owner, `/jobs/${match.id}/application`, {}).expect(200)
+  ).body as { id: string; revision: number };
+  const cv = documentDetailSchema.parse(
+    (
+      await profileWrite(owner, `/jobs/${match.id}/documents`, {
+        resumeId: resume.id,
+        kind: 'resume',
+        params: {},
+      }).expect(200)
+    ).body,
+  );
+  const stored = await db.generatedDocument.findUniqueOrThrow({
+    where: { id: cv.id },
+  });
+  const foreignResume = await db.resume.create({
+    data: { userId: otherId, title: 'Other master', data: syntheticResume },
+  });
+  const foreign = await db.generatedDocument.create({
+    data: {
+      userId: otherId,
+      jobOfferId: offer.id,
+      resumeId: foreignResume.id,
+      kind: 'resume',
+      version: 1,
+      content: stored.content as Prisma.InputJsonValue,
+      params: stored.params as Prisma.InputJsonValue,
+      integrityReport: stored.integrityReport as Prisma.InputJsonValue,
+      model: 'test',
+      tokensIn: 0,
+      tokensOut: 0,
+    },
+  });
+  const fields = {
+    status: 'to_apply',
+    appliedAt: null,
+    followUpAt: null,
+    notes: null,
+    resumeDocId: foreign.id,
+    letterDocId: null,
+  };
+  await profileWrite(owner, `/applications/${app.id}`, {
+    revision: app.revision,
+    fields,
+  }).expect(404);
+  for (let i = 0; i < 51; i++) {
+    const other = await db.jobOffer.create({
+      data: {
+        sourceId: 'greenhouse',
+        externalId: 'tracking-' + i,
+        dedupKey: randomBytes(32).toString('hex'),
+        url: `https://example.invalid/other-${i}`,
+        title: 'Different role ' + i,
+        company: 'Other company',
+        location: { city: 'Lyon', country: 'FR' },
+        remote: 'unknown',
+        contractType: 'unknown',
+        description: 'Synthetic independent role.',
+      },
+    });
+    await db.application.create({ data: { userId, jobOfferId: other.id } });
+    if (i === 0) {
+      const unrelated = await db.generatedDocument.create({
+        data: {
+          userId,
+          jobOfferId: other.id,
+          resumeId: resume.id,
+          kind: 'resume',
+          version: 1,
+          content: stored.content as Prisma.InputJsonValue,
+          params: stored.params as Prisma.InputJsonValue,
+          integrityReport: stored.integrityReport as Prisma.InputJsonValue,
+          model: 'test',
+          tokensIn: 0,
+          tokensOut: 0,
+        },
+      });
+      await profileWrite(owner, `/applications/${app.id}`, {
+        revision: app.revision,
+        fields: { ...fields, resumeDocId: unrelated.id },
+      }).expect(404);
+    }
+  }
+  const page = await request(server)
+    .get('/applications')
+    .set('Cookie', owner.cookie)
+    .expect(200);
+  expect(page.body.items).toHaveLength(50);
+  const next = await request(server)
+    .get('/applications?cursor=' + page.body.nextCursor)
+    .set('Cookie', owner.cookie)
+    .expect(200);
+  expect(next.body.items).toHaveLength(2);
+  expect(next.body.nextCursor).toBeNull();
+  expect(
+    new Set(
+      [...page.body.items, ...next.body.items].map((r: unknown) =>
+        typeof r === 'object' && r !== null && 'id' in r ? r.id : null,
+      ),
+    ).size,
+  ).toBe(52);
+  await request(server)
+    .get('/applications?cursor=invalid')
+    .set('Cookie', owner.cookie)
+    .expect(400);
+  await profileWrite(owner, `/applications/${app.id}`, {
+    revision: app.revision,
+    fields: { ...fields, resumeDocId: null, status: 'applied' },
+  }).expect(400);
+  expect(
+    (await db.application.findUniqueOrThrow({ where: { id: app.id } }))
+      .resumeDocId,
+  ).toBeNull();
+});
+it('rolls back application creation if the owned offer flag cannot be updated', async () => {
+  const { owner, match } = await generationContext();
+  await profileWrite(owner, `/jobs/${match.id}/status`, {
+    status: 'applied',
+    appliedAt: '2026-11-06',
+  }).expect(404);
+  expect(await db.application.count({ where: { userId } })).toBe(0);
+});
+it('serializes applied marking and stage edits across duplicate URLs without overwriting an advanced stage', async () => {
+  const { owner, match, offer } = await applicationContext();
+  const application = (
+    await profileWrite(owner, `/jobs/${match.id}/application`, {}).expect(200)
+  ).body as { id: string };
+  const copy = await db.jobOffer.create({
+    data: {
+      sourceId: 'email',
+      externalId: 'concurrent-copy',
+      privateUserId: userId,
+      dedupKey: randomBytes(32).toString('hex'),
+      url: offer.url,
+      title: 'Updated source title',
+      company: offer.company,
+      location: offer.location as Prisma.InputJsonValue,
+      description: offer.description,
+      remote: 'unknown',
+      contractType: 'unknown',
+    },
+  });
+  const duplicate = await db.searchMatch.create({
+    data: {
+      userId,
+      searchId: match.searchId,
+      runId: match.runId,
+      jobOfferId: copy.id,
+      inputKey: 'concurrent-copy',
+      passed: true,
+      notes: [],
+    },
+  });
+  await db.userJobMatch.create({
+    data: {
+      userId,
+      jobOfferId: copy.id,
+      searchId: match.searchId,
+      hardFilterPassed: true,
+    },
+  });
+  for (let i = 0; i < 5; i++) {
+    const current = await db.application.update({
+      where: { id: application.id },
+      data: {
+        status: 'to_apply',
+        appliedAt: null,
+        notes: 'Concurrent note',
+        followUpAt: new Date('2026-11-09T00:00:00Z'),
+        revision: { increment: 1 },
+      },
+    });
+    const [marked, moved] = await Promise.all([
+      profileWrite(owner, `/jobs/${duplicate.id}/status`, {
+        status: 'applied',
+        appliedAt: '2026-11-06',
+      }),
+      profileWrite(owner, `/applications/${current.id}/status`, {
+        revision: current.revision,
+        status: 'interview',
+        appliedAt: '2026-11-06',
+      }),
+    ]);
+    expect(marked.status).toBe(200);
+    expect([200, 409]).toContain(moved.status);
+    const saved = await db.application.findUniqueOrThrow({
+      where: { id: application.id },
+    });
+    expect(saved.notes).toBe('Concurrent note');
+    expect(saved.followUpAt?.toISOString().slice(0, 10)).toBe('2026-11-09');
+    expect(saved.status).toBe(moved.status === 200 ? 'interview' : 'applied');
+    if (moved.status === 409)
+      await profileWrite(owner, `/applications/${saved.id}/status`, {
+        revision: saved.revision,
+        status: 'interview',
+      }).expect(200);
+    await profileWrite(owner, `/jobs/${duplicate.id}/status`, {
+      status: 'applied',
+    }).expect(200);
+    expect(
+      (
+        await db.application.findUniqueOrThrow({
+          where: { id: application.id },
+        })
+      ).status,
+    ).toBe('interview');
+  }
+  expect(await db.application.count({ where: { userId } })).toBe(1);
+});
+it('keeps concurrent application saves within their transaction connection without exhausting the pool', async () => {
+  const { owner, match } = await applicationContext();
+  const created = (
+    await profileWrite(owner, `/jobs/${match.id}/application`, {}).expect(200)
+  ).body as { id: string; revision: number };
+  const responses = await Promise.all(
+    Array.from({ length: 20 }, () =>
+      profileWrite(owner, `/applications/${created.id}/status`, {
+        revision: created.revision,
+        status: 'interview',
+        appliedAt: '2026-11-06',
+      }),
+    ),
+  );
+  expect(responses.filter((r) => r.status === 200)).toHaveLength(1);
+  expect(responses.filter((r) => r.status === 409)).toHaveLength(19);
+  const saved = await db.application.findUniqueOrThrow({
+    where: { id: created.id },
+  });
+  expect(saved.status).toBe('interview');
+  expect(saved.revision).toBe(created.revision + 1);
 });
