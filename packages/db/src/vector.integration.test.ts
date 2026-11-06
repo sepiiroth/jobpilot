@@ -15,7 +15,7 @@ let container: StartedTestContainer | undefined;
 let db: PrismaClient;
 beforeAll(async () => {
   const password = randomBytes(24).toString('hex');
-  container = await new GenericContainer('pgvector/pgvector:0.8.2-pg18')
+  container = await new GenericContainer('jobpilot-db:phase12')
     .withEnvironment({
       POSTGRES_USER: 'jobpilot',
       POSTGRES_DB: 'jobpilot',

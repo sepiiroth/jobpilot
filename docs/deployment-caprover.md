@@ -1,6 +1,6 @@
 # Deploy JobPilot on CapRover
 
-This guide covers the containerized web, authenticated API and standalone worker. Phases 5–8 add profiles, AI, collection and scoring; scheduling and backups remain later phases. The assistant prepares these files and verifies local images; only the maintainer publishes releases and starts deployments.
+This guide covers the containerized web, authenticated API and standalone worker. The application includes profiles, AI, collection, scoring, scheduling and encrypted backups. The assistant prepares these files and verifies local images; only the maintainer publishes releases and starts deployments.
 
 ## 1. Prerequisites
 
@@ -28,7 +28,7 @@ Enable **Has Persistent Data** on the two data apps and mount the directories in
 
 In jobpilot-db, set POSTGRES_USER=jobpilot and POSTGRES_DB=jobpilot. Generate a unique POSTGRES_PASSWORD locally and save it in the dashboard environment variables. Never place real credentials in captain-definition, workflow files or documentation.
 
-Deploy the existing Docker image pgvector/pgvector:0.8.2-pg18 from the Deployment tab. This image was verified locally to contain PostgreSQL 18.4 and pgvector 0.8.2. Do not use CapRover's standard PostgreSQL one-click image because it does not include pgvector. Wait for the database logs to report readiness.
+Deploy the scanned custom image ghcr.io/<lowercase-owner>/jobpilot-db:<version>-<12-character-commit-id> from the Deployment tab. The release workflow builds it using packages/db/Dockerfile, PostgreSQL 18.6 on Alpine 3.24 and pgvector 0.8.7 compiled from the checksum-verified PGXN archive. Require PostgreSQL 18.6 or newer in major 18 and pgvector 0.8.7; verify the running server and extension versions before opening the service. For an existing installation, first take an encrypted backup and verify restoration to an empty database on a **new target volume** before switching traffic. The switch from Debian to Alpine changes libc, locale behavior and the PostgreSQL OS user ID: reusing an existing volume across variants can require rebuilding collation-dependent indexes, and must not be done as a blind image swap. Inspect the restored extension version and update it to 0.8.7 where necessary. Preserve the old image/volume until the cutover and rollback checks pass; PostgreSQL stays in major 18. See the [restore guide](operations-and-recovery.md) and [PostgreSQL collation version guidance](https://www.postgresql.org/docs/18/sql-altercollation.html). Do not use CapRover's standard PostgreSQL one-click image because it does not include pgvector. Wait for the database logs to report readiness.
 
 Other apps reach this database at srv-captain--jobpilot-db:5432 over CapRover's internal network. Build DATABASE_URL from the database name and user above, your password and that host. Percent-encode reserved characters in URI credentials; hexadecimal passwords avoid this encoding issue.
 
@@ -127,9 +127,9 @@ Only the maintainer creates and pushes a semantic version tag such as v0.1.0, af
 The jobs run in this order:
 
 1. CI validates the repository.
-2. A matrix builds web, API and worker locally on runners. Trivy rejects critical vulnerabilities before any image is pushed.
+2. A matrix builds web, API, worker and the custom PostgreSQL/pgvector image locally on runners. Trivy rejects HIGH and CRITICAL vulnerabilities before any image is pushed.
 3. Images are published as ghcr.io/<lowercase-owner>/jobpilot-<app>:<version>-<12-character-commit-id>.
-4. Deployment actions submit the API, then worker, then web images to CapRover. A failed earlier step stops subsequent steps.
+4. Deployment actions submit the API, then worker, then web images to CapRover. A failed earlier step stops subsequent steps. The database image is built, scanned and published with the release but is never automatically deployed. For a database image change, stop application writes and manually validate a backup restored to a new empty volume before switching the database app. Retain the old image and volume until cutover checks pass.
 
 The CapRover action submits deployments in detached mode. A successful action means the request was accepted, not that the new containers are healthy. Check the three apps' logs and Docker health states after every release; do not regard a green submission alone as successful service verification. Release submissions are serialized so separate tag workflows cannot interleave.
 
@@ -176,15 +176,15 @@ pnpm db:generate
 pnpm lint
 pnpm typecheck
 pnpm test
-docker build -f apps/api/Dockerfile -t jobpilot-api:phase4 .
-docker build -f apps/worker/Dockerfile -t jobpilot-worker:phase4 .
-docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_API_URL=http://localhost:3001 -t jobpilot-web:phase4 .
-docker compose -p jobpilot-phase4-check -f docker-compose.smoke.yml up -d --wait --wait-timeout 180
-docker compose -p jobpilot-phase4-check -f docker-compose.smoke.yml ps
-docker compose -p jobpilot-phase4-check -f docker-compose.smoke.yml exec -T api id -u
-docker compose -p jobpilot-phase4-check -f docker-compose.smoke.yml exec -T worker id -u
-docker compose -p jobpilot-phase4-check -f docker-compose.smoke.yml exec -T web id -u
-docker compose -p jobpilot-phase4-check -f docker-compose.smoke.yml down --volumes
+docker build -f apps/api/Dockerfile -t jobpilot-api:phase12 .
+docker build -f apps/worker/Dockerfile -t jobpilot-worker:phase12 .
+docker build -f apps/web/Dockerfile --build-arg NEXT_PUBLIC_API_URL=http://localhost:3001 -t jobpilot-web:phase12 .
+docker compose -p jobpilot-phase12-check -f docker-compose.smoke.yml up -d --wait --wait-timeout 180
+docker compose -p jobpilot-phase12-check -f docker-compose.smoke.yml ps
+docker compose -p jobpilot-phase12-check -f docker-compose.smoke.yml exec -T api id -u
+docker compose -p jobpilot-phase12-check -f docker-compose.smoke.yml exec -T worker id -u
+docker compose -p jobpilot-phase12-check -f docker-compose.smoke.yml exec -T web id -u
+docker compose -p jobpilot-phase12-check -f docker-compose.smoke.yml down --volumes
 ```
 
 This smoke stack creates a separate database and Valkey without published ports or persistent volumes; the down --volumes command removes only its temporary test data, including anonymous database volumes. It does not use the regular local Compose database. Use hexadecimal local POSTGRES_PASSWORD and VALKEY_PASSWORD values so the smoke connection strings are valid without additional URL encoding. ENCRYPTION_KEY and SESSION_SECRET are required as in the API setup. No CapRover or GHCR credentials are needed for these checks.
@@ -193,13 +193,13 @@ This smoke stack creates a separate database and Valkey without published ports 
 
 Each apps/<app>/captain-definition declares an existing-image deployment with explicit replacement markers. Replace both the owner and version/commit markers with the exact published image reference, then submit that file from the app's Deployment tab. Never upload the unedited markers. Use the same release for all three apps. Manual deployment does not build source on the VPS.
 
-Before production releases that change the schema, arrange an external database backup. Automated encrypted backups are a phase 12 feature and are not provided here. A container rollback does not reverse database migrations; only use an older image when it is compatible with the current schema. Restore from your external backup if an incompatible migration requires recovery. Do not delete persistent volumes during rollback.
+Before production releases that change the schema, verify a recent encrypted backup and a successful restore drill. Configure the worker using [encrypted backup and recovery instructions](operations-and-recovery.md); backups remain disabled when the complete S3/age configuration is absent. A container rollback does not reverse database migrations; only use an older image when it is compatible with the current schema. Restore from your external backup if an incompatible migration requires recovery. Do not delete persistent volumes during rollback.
 
 For build failures, read the failing CI step before retrying. For pull failures, check GHCR package visibility and CapRover registry credentials. For unhealthy API startup, check migration logs and the internal database/Valkey URLs. For login failures, check HTTPS, exact WEB_ORIGIN, the public build-time API URL, cookie scope and trusted proxy count.
 
 Official references: [CapRover deployment action](https://github.com/caprover/deploy-from-github), [Docker Actions](https://docs.docker.com/build/ci/github-actions/), [pnpm production deploy](https://pnpm.io/10.x/cli/deploy), [PostgreSQL image data layout](https://hub.docker.com/_/postgres).
 
-Production stages use Node.js 24.22.1 on Debian 13 (trixie-slim). The build stages retain bookworm-slim for reusable tooling layers; no build-stage operating-system files are copied into runtime images. The runtime base was selected after the critical-vulnerability scan flagged the older Debian zlib package.
+Build and production stages use Node.js 24.22.1 on Alpine 3.24. PostgreSQL uses a custom Alpine image with a checksum-verified pgvector build; build tools stay in a separate build stage. Runtime packages receive available Alpine updates. The three Node services run as UID 1000; npm/npx are removed from their runtime images. Native Argon2 and Prisma must pass the production smoke check after any base change.
 
 ## AI settings and request deadlines
 
@@ -214,3 +214,9 @@ Configure SCORING_LLM_TOP_N in the worker (default 30, range 0–100). Apply the
 ## Phase 9: email alerts
 
 The worker now consumes IMAP alerts during collection. Configure the encrypted mailbox password and authorized senders in Settings. Keep `ALLOW_PRIVATE_IMAP_HOST=false` unless an internal mailbox is explicitly intended; TLS validation stays mandatory. Apply API migration `20261105223000_email_alerts` before deploying the worker. Configure the optional sender restriction and bounds described in [email alerts](email-alerts.md). Dovecot is a disposable test dependency, not an additional production service.
+
+## Daily operations
+
+Deploy the phase 12 worker image with PostgreSQL 18 client tools and age included. Set `JOB_RETENTION_DAYS` (default 60). Optional collection schedules are saved per user in Settings and reconciled using BullMQ Job Schedulers; all cron times are UTC. Purge runs at 02:00 UTC and encrypted backups at 03:00 UTC. Follow [the operations guide](operations-and-recovery.md) for all `BACKUP_*` variables, bucket lifecycle, least-privilege credentials, encryption key custody and the restore CLI. The worker requires HTTPS for the S3 endpoint and validates the age recipient with the age executable before becoming ready. Settings expose only backup status and last success time.
+
+Use the [publication review](publication-review.md) before releasing. Image scanning now rejects both HIGH and CRITICAL findings. CI also verifies the main browser journey and an isolated encrypted restore. The assistant does not execute the release workflow, publish images, access Git history or deploy to CapRover. The independent installation review remains a human release gate.

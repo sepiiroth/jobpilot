@@ -1,3 +1,7 @@
+import { execFileSync } from 'node:child_process';
+import { OperationsRuntime } from './operations/runtime.ts';
+import { operationsEnvironmentSchema } from '@jobpilot/shared/operations';
+import { backupToS3 } from './operations/s3.ts';
 import { emailEnvironmentSchema } from '@jobpilot/shared/email';
 import { scoringEnvironmentSchema } from '@jobpilot/shared/jobs';
 import { BullModule, getQueueToken } from '@nestjs/bullmq';
@@ -45,13 +49,38 @@ const schema = z
   .extend(scoringEnvironmentSchema.shape)
   .extend(emailEnvironmentSchema.shape);
 try {
-  const parsed = schema.safeParse(process.env);
+  const parsed = schema.and(operationsEnvironmentSchema).safeParse(process.env);
   if (!parsed.success)
     throw new Error(
       'Invalid worker configuration: ' +
-        parsed.error.issues.map((i) => i.path.join('.')).join(', '),
+        parsed.error.issues
+          .map((i) => (i.path.length ? i.path.join('.') : i.message))
+          .join(', '),
     );
   const config = parsed.data;
+  if (config.BACKUP_S3_BUCKET) {
+    try {
+      execFileSync(
+        'age',
+        ['--encrypt', '--recipient', config.BACKUP_AGE_RECIPIENT],
+        {
+          input: '',
+          stdio: ['pipe', 'ignore', 'ignore'],
+          timeout: 5000,
+          windowsHide: true,
+        },
+      );
+    } catch {
+      throw new Error(
+        'Invalid worker configuration: BACKUP_AGE_RECIPIENT (age validation failed)',
+      );
+    }
+    execFileSync('pg_dump', ['--version'], {
+      stdio: 'ignore',
+      timeout: 5000,
+      windowsHide: true,
+    });
+  }
   const db = createDatabaseClient(config.DATABASE_URL);
   const redis = new Redis(config.VALKEY_URL, {
     lazyConnect: true,
@@ -108,6 +137,10 @@ try {
     ],
     providers: [
       {
+        provide: OperationsRuntime,
+        useValue: new OperationsRuntime(db, config, () => backupToS3(config)),
+      },
+      {
         provide: CollectionRuntime,
         useFactory: (llm: LlmService, ...instances: Queue[]) =>
           new CollectionRuntime(db, llm, new CryptoService(config), config, {
@@ -141,12 +174,13 @@ try {
   });
   app.enableShutdownHooks();
   await app.get(CollectionRuntime).start();
+  await app.get(OperationsRuntime).start();
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
     server.listen(config.WORKER_HEALTH_PORT, '127.0.0.1', () => resolve());
   });
   ready = true;
-  console.log('Worker started; collection and embedding queues ready');
+  console.log('Worker started; collection, scoring and daily operations ready');
 } catch (error) {
   console.error(
     error instanceof Error &&

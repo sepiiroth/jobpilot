@@ -124,7 +124,7 @@ beforeAll(async () => {
     if (result.exitCode !== 0)
       throw new Error('Synthetic mailbox seed failed: ' + result.output);
   }
-  pg = await new GenericContainer('pgvector/pgvector:0.8.2-pg18')
+  pg = await new GenericContainer('jobpilot-db:phase12')
     .withEnvironment({
       POSTGRES_USER: 'jobpilot',
       POSTGRES_DB: 'jobpilot',

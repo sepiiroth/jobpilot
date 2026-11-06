@@ -154,7 +154,7 @@ async function login(): Promise<Browser> {
 }
 beforeAll(async () => {
   const infrastructurePassword = randomBytes(24).toString('hex');
-  postgres = await new GenericContainer('pgvector/pgvector:0.8.2-pg18')
+  postgres = await new GenericContainer('jobpilot-db:phase12')
     .withEnvironment({
       POSTGRES_USER: 'jobpilot',
       POSTGRES_DB: 'jobpilot',
@@ -669,6 +669,8 @@ it('persists provider and IMAP preferences without leaking to another user', asy
     stranger = await browserAs(otherId);
   const input = {
     llmProvider: 'ollama',
+    collectionCron: null,
+    collectionCooldownMin: 30,
     generationModel: 'local-generation',
     scoringModel: 'local-scoring',
     embeddingProvider: 'ollama',
@@ -2640,4 +2642,50 @@ it('keeps concurrent application saves within their transaction connection witho
   });
   expect(saved.status).toBe('interview');
   expect(saved.revision).toBe(created.revision + 1);
+});
+
+it('saves only the authenticated schedule and rejects invalid cron or missing CSRF', async () => {
+  const owner = await browserAs(userId),
+    stranger = await browserAs(otherId);
+  const current = (
+    await request(server)
+      .get('/settings')
+      .set('Cookie', owner.cookie)
+      .expect(200)
+  ).body as Record<string, unknown>;
+  await profileWrite(owner, '/settings', {
+    ...current,
+    collectionCron: '0 7 * * 1-5',
+    collectionCooldownMin: 60,
+  }).expect(200);
+  const settings = await db.userSettings.findUniqueOrThrow({
+    where: { userId },
+  });
+  expect(settings.collectionCron).toBe('0 7 * * 1-5');
+  expect(
+    (
+      await request(server)
+        .get('/settings')
+        .set('Cookie', stranger.cookie)
+        .expect(200)
+    ).body.collectionCron,
+  ).toBeNull();
+  await profileWrite(owner, '/settings', {
+    ...current,
+    collectionCron: '60 24 * * *',
+  }).expect(400);
+  await request(server)
+    .post('/settings')
+    .set('Cookie', owner.cookie)
+    .send({ ...current, collectionCron: null })
+    .expect(403);
+  await request(server).get('/settings/operations').expect(401);
+  await profileWrite(owner, '/settings', {
+    ...current,
+    collectionCron: null,
+  }).expect(200);
+  expect(
+    (await db.userSettings.findUniqueOrThrow({ where: { userId } }))
+      .collectionCron,
+  ).toBeNull();
 });

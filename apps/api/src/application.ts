@@ -179,9 +179,10 @@ export async function createApplication(
   })(SearchesModule);
   class SettingsModule {}
   Module({
-    imports: [ResumesModule],
+    imports: [ResumesModule, InfrastructureModule],
     controllers: [SettingsController],
     providers: [
+      { provide: 'QUEUE_PREFIX', useValue: config.COLLECTION_QUEUE_PREFIX },
       {
         provide: SettingsService,
         useFactory: (embeddings: ResumeEmbeddings) =>

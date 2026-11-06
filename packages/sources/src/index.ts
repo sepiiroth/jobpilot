@@ -29,3 +29,5 @@ export {
   type EmailConnectionFactory,
   type ImapSettings,
 } from './email/imap.ts';
+
+export { FranceTravailSource } from './france-travail.ts';

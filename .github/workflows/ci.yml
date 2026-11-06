@@ -24,4 +24,22 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - name: Reject high and critical Valkey vulnerabilities
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8
+        with:
+          image-ref: valkey/valkey:8-alpine
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: '1'
       - run: pnpm audit --prod
+      - run: pnpm osv:scan
+      - name: Build web for isolated browser tests
+        run: pnpm --filter @jobpilot/web build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - name: Verify encrypted recovery with production tools
+        run: |
+          docker build -f apps/worker/Dockerfile -t jobpilot-worker:phase12 .
+          pnpm verify:recovery

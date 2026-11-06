@@ -1,6 +1,6 @@
 services:
   database:
-    image: pgvector/pgvector:0.8.2-pg18
+    image: jobpilot-db:phase12
     environment:
       POSTGRES_USER: jobpilot
       POSTGRES_DB: jobpilot
@@ -26,7 +26,7 @@ services:
       timeout: 3s
       retries: 20
   api:
-    image: jobpilot-api:phase4
+    image: jobpilot-api:phase12
     depends_on:
       database:
         condition: service_healthy
@@ -41,7 +41,7 @@ services:
       WEB_ORIGIN: https://web.example.invalid
       LOG_LEVEL: warn
   worker:
-    image: jobpilot-worker:phase4
+    image: jobpilot-worker:phase12
     depends_on:
       api:
         condition: service_healthy
@@ -55,4 +55,4 @@ services:
       VALKEY_URL: redis://:${VALKEY_PASSWORD}@valkey:6379
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in .env}
   web:
-    image: jobpilot-web:phase4
+    image: jobpilot-web:phase12

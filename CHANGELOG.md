@@ -56,3 +56,12 @@
 - Add phase 11 private application tracking with idempotent submitted-offer creation, revision-protected edits, notes and local calendar follow-up reminders.
 - Add a French accessible dnd-kit board with keyboard/pointer dragging and native status selectors.
 - Link reviewed immutable document versions, retain tracking after search deletion, and export application revisions in schema version 5.
+
+- Add phase 12 optional per-user UTC collection Job Schedulers with current-setting checks, cooldowns and stale-schedule cleanup.
+- Add bounded nightly retention that preserves explicit actions, documents, applications and active collection references.
+- Stream PostgreSQL snapshots through age before private S3 upload, with checksums, bounded retries, status reporting and ciphertext cleanup.
+- Add an empty-database restore CLI, session revocation and an isolated production-tool recovery drill.
+- Add pinned Playwright and S3 dependencies, a simulated-provider main-flow browser test, synthetic screenshots and user/operations guides.
+- Build Alpine Node images and a checksum-verified PostgreSQL 18.6/pgvector 0.8.7 image; verify empty-target Debian-to-Alpine recovery.
+- Keep France Travail deliberately disabled with a tested normalization boundary.
+- Extend CI with browser/recovery/OSV checks and reject high as well as critical image findings; document remaining maintainer publication gates.

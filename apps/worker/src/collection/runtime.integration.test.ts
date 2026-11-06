@@ -1,3 +1,6 @@
+import { Redis } from 'ioredis';
+import { OperationsRuntime } from '../operations/runtime.ts';
+import { operationsEnvironmentSchema } from '@jobpilot/shared/operations';
 import { beforeAll, beforeEach, afterAll, it, expect } from 'vitest';
 import {
   GenericContainer,
@@ -42,6 +45,11 @@ let pg: StartedTestContainer | undefined,
 let userId = '',
   otherId = '',
   mode = 'failure';
+let operationsConfig: {
+  VALKEY_URL: string;
+  COLLECTION_QUEUE_PREFIX: string;
+  COLLECTION_COOLDOWN_MINUTES: number;
+};
 const requested: string[] = [];
 const provider: LlmProvider = {
   async generateStructured() {
@@ -59,7 +67,7 @@ const provider: LlmProvider = {
 };
 beforeAll(async () => {
   const password = randomBytes(24).toString('hex');
-  pg = await new GenericContainer('pgvector/pgvector:0.8.2-pg18')
+  pg = await new GenericContainer('jobpilot-db:phase12')
     .withEnvironment({
       POSTGRES_USER: 'jobpilot',
       POSTGRES_DB: 'jobpilot',
@@ -75,8 +83,8 @@ beforeAll(async () => {
     .withExposedPorts(6379)
     .withWaitStrategy(Wait.forLogMessage('Ready to accept connections'))
     .start();
-  const url = `postgresql://jobpilot:${password}@${pg.getHost()}:${pg.getMappedPort(5432)}/jobpilot`;
-  const valkey = `redis://:${password}@${vk.getHost()}:${vk.getMappedPort(6379)}`;
+  const url = `postgresql://jobpilot:${password}@${pg.getHost() === 'localhost' ? '127.0.0.1' : pg.getHost()}:${pg.getMappedPort(5432)}/jobpilot`;
+  const valkey = `redis://:${password}@${vk.getHost() === 'localhost' ? '127.0.0.1' : vk.getHost()}:${vk.getMappedPort(6379)}`;
   execFileSync(
     process.execPath,
     ['node_modules/prisma/build/index.js', 'migrate', 'deploy'],
@@ -94,6 +102,7 @@ beforeAll(async () => {
     }),
     VALKEY_URL: valkey,
   };
+  operationsConfig = config;
   const options = {
     connection: queueConnection(valkey, true),
     prefix: config.COLLECTION_QUEUE_PREFIX,
@@ -354,4 +363,232 @@ it('coalesces concurrent collection starts and fences expired worker leases', as
     where: { id: a.id },
     data: { status: 'failed', finishedAt: new Date() },
   });
+});
+
+it('reconciles per-user job schedulers and rejects stale or disabled schedules', async () => {
+  await prepare(userId, ['greenhouse']);
+  await prepare(otherId, ['greenhouse']);
+  const cron = '0 0 1 1 *';
+  await db.userSettings.update({
+    where: { userId },
+    data: { collectionCron: cron },
+  });
+  const ops = new OperationsRuntime(
+    db,
+    { ...operationsEnvironmentSchema.parse({}), ...operationsConfig },
+    async () => {},
+  );
+  const q = new Queue('operations', {
+    connection: queueConnection(operationsConfig.VALKEY_URL),
+    prefix: operationsConfig.COLLECTION_QUEUE_PREFIX,
+  });
+  try {
+    await ops.reconcile();
+    await ops.reconcile();
+    expect(
+      (await q.getJobSchedulers())
+        .filter((row) => row.key.startsWith('user-'))
+        .map((row) => row.key),
+    ).toEqual(['user-' + userId]);
+    await ops.collect(otherId, cron);
+    await ops.collect(userId, '0 1 1 1 *');
+    expect(await db.collectionRun.count()).toBe(0);
+    await Promise.all([ops.collect(userId, cron), ops.collect(userId, cron)]);
+    expect(
+      await db.collectionRun.count({ where: { userId, trigger: 'scheduled' } }),
+    ).toBe(1);
+    await db.userSettings.update({
+      where: { userId },
+      data: { collectionCron: null },
+    });
+    await ops.reconcile();
+    expect(
+      (await q.getJobSchedulers()).filter((row) => row.key.startsWith('user-')),
+    ).toHaveLength(0);
+    await ops.collect(userId, cron);
+    expect(await db.collectionRun.count({ where: { userId } })).toBe(1);
+  } finally {
+    await ops.beforeApplicationShutdown();
+    await q.close();
+  }
+});
+it('purges only old untouched offers and preserves all explicit actions and active collection references', async () => {
+  await prepare(userId, ['greenhouse']);
+  const search = await db.search.findFirstOrThrow({ where: { userId } });
+  const create = async (label: string, old = true) =>
+    db.jobOffer.create({
+      data: {
+        sourceId: 'greenhouse',
+        externalId: label,
+        dedupKey: label,
+        url: 'https://example.invalid/' + label,
+        title: label,
+        company: 'Synthetic company',
+        location: { city: 'Lyon', country: 'FR' },
+        remote: 'unknown',
+        contractType: 'unknown',
+        description: 'Synthetic',
+        fetchedAt: old ? new Date('2020-01-01') : new Date(),
+      },
+    });
+  const old = await create('untouched'),
+    recent = await create('recent', false);
+  for (const status of ['interesting', 'ignored', 'applied']) {
+    const offer = await create(status);
+    await db.userJobMatch.create({
+      data: {
+        userId,
+        searchId: search.id,
+        jobOfferId: offer.id,
+        status,
+        hardFilterPassed: true,
+      },
+    });
+  }
+  const draft = await create('draft');
+  await db.application.create({ data: { userId, jobOfferId: draft.id } });
+  const active = await create('active');
+  const run = await db.collectionRun.create({
+    data: { userId, trigger: 'manual' },
+  });
+  const step = await db.collectionStep.create({
+    data: {
+      userId,
+      runId: run.id,
+      searchId: search.id,
+      source: 'greenhouse',
+      criteria: {},
+    },
+  });
+  await db.collectionItem.create({
+    data: {
+      userId,
+      runId: run.id,
+      stepId: step.id,
+      externalId: 'active',
+      jobOfferId: active.id,
+      isNew: true,
+    },
+  });
+  const ops = new OperationsRuntime(
+    db,
+    { ...operationsEnvironmentSchema.parse({}), ...operationsConfig },
+    async () => {},
+  );
+  try {
+    expect((await ops.purge()).count).toBe(1);
+    expect(await db.jobOffer.findUnique({ where: { id: old.id } })).toBeNull();
+    expect(await db.jobOffer.count()).toBe(6);
+    expect(
+      await db.jobOffer.findUnique({ where: { id: recent.id } }),
+    ).not.toBeNull();
+    await db.collectionRun.update({
+      where: { id: run.id },
+      data: { status: 'completed' },
+    });
+    expect((await ops.purge()).count).toBe(1);
+  } finally {
+    await ops.beforeApplicationShutdown();
+  }
+});
+it('reports disabled, successful and failed backups without exposing configuration', async () => {
+  const client = new Redis(operationsConfig.VALKEY_URL, {
+    maxRetriesPerRequest: 1,
+  });
+  const key = operationsConfig.COLLECTION_QUEUE_PREFIX + ':operations-status';
+  const disabled = new OperationsRuntime(
+    db,
+    { ...operationsEnvironmentSchema.parse({}), ...operationsConfig },
+    async () => {
+      throw new Error('Must not run');
+    },
+  );
+  try {
+    await disabled.runBackup();
+    expect(JSON.parse((await client.get(key))!).backupStatus).toBe('disabled');
+  } finally {
+    await disabled.beforeApplicationShutdown();
+  }
+  let fail = false;
+  const enabled = new OperationsRuntime(
+    db,
+    {
+      ...operationsEnvironmentSchema.parse({}),
+      ...operationsConfig,
+      BACKUP_S3_BUCKET: 'synthetic',
+    },
+    async () => {
+      if (fail) throw new Error('Private details');
+    },
+  );
+  try {
+    await enabled.runBackup();
+    const saved = JSON.parse((await client.get(key))!);
+    expect(saved.backupStatus).toBe('succeeded');
+    expect(saved.lastBackupAt).toBeTruthy();
+    fail = true;
+    await expect(enabled.runBackup()).rejects.toThrow(
+      'Encrypted backup failed',
+    );
+    const failed = JSON.parse((await client.get(key))!);
+    expect(failed.backupStatus).toBe('failed');
+    expect(failed.lastBackupAt).toBe(saved.lastBackupAt);
+    expect(JSON.stringify(failed)).not.toContain('Private details');
+  } finally {
+    await enabled.beforeApplicationShutdown();
+    client.disconnect();
+  }
+});
+it('executes a BullMQ Job Scheduler delivery through the real scheduled collection path', async () => {
+  await prepare(userId, ['greenhouse']);
+  const cron = '0 0 1 1 *';
+  await db.userSettings.update({
+    where: { userId },
+    data: { collectionCron: cron, collectionCooldownMin: 30 },
+  });
+  const ops = new OperationsRuntime(
+    db,
+    { ...operationsEnvironmentSchema.parse({}), ...operationsConfig },
+    async () => {},
+  );
+  const queue = new Queue('operations', {
+    connection: queueConnection(operationsConfig.VALKEY_URL),
+    prefix: operationsConfig.COLLECTION_QUEUE_PREFIX,
+  });
+  try {
+    await ops.start();
+    await queue.upsertJobScheduler(
+      'integration-delivery',
+      { every: 1000 },
+      {
+        name: 'scheduled-collection',
+        data: { userId, cron },
+        opts: { removeOnComplete: true, removeOnFail: true },
+      },
+    );
+    await expect
+      .poll(
+        () =>
+          db.collectionRun.count({ where: { userId, trigger: 'scheduled' } }),
+        { timeout: 15000 },
+      )
+      .toBe(1);
+    await queue.removeJobScheduler('integration-delivery');
+    const run = await db.collectionRun.findFirstOrThrow({
+      where: { userId, trigger: 'scheduled' },
+    });
+    await runtime.recover();
+    const result = await finish(userId, run.id);
+    expect(result.status).toBe('completed_with_errors');
+    expect(result.errors).toEqual([
+      { source: 'scoring', code: 'SCORING_NOT_READY' },
+    ]);
+    expect(result.stats.found).toBe(1);
+    expect(result.stats.embeddingsReady).toBe(1);
+    expect(await db.collectionRun.count({ where: { userId } })).toBe(1);
+  } finally {
+    await queue.removeJobScheduler('integration-delivery');
+    await ops.beforeApplicationShutdown();
+    await queue.close();
+  }
 });

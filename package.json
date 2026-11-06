@@ -10,18 +10,23 @@
   "scripts": {
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
+    "test": "pnpm db:image && turbo run test --concurrency=1",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "node scripts/prepare.mjs",
     "secrets:scan": "gitleaks dir --redact .",
     "db:migrate": "pnpm --filter @jobpilot/db migrate",
     "db:generate": "pnpm --filter @jobpilot/db generate",
-    "db:seed": "pnpm --filter @jobpilot/db seed"
+    "db:seed": "pnpm --filter @jobpilot/db seed",
+    "verify:recovery": "pnpm db:image && node scripts/verify-recovery.mjs",
+    "test:e2e": "pnpm db:image && playwright test",
+    "osv:scan": "node scripts/osv-scan.mjs",
+    "db:image": "docker build -f packages/db/Dockerfile -t jobpilot-db:phase12 ."
   },
   "devDependencies": {
     "@commitlint/cli": "19.8.1",
     "@commitlint/config-conventional": "19.8.1",
+    "@playwright/test": "1.65.0",
     "eslint": "9.39.1",
     "husky": "9.1.7",
     "lint-staged": "16.2.7",

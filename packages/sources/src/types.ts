@@ -17,7 +17,13 @@ export interface SourceContext {
   get: (url: URL, source: string) => Promise<unknown>;
 }
 export interface JobSource {
-  readonly id: 'adzuna' | 'greenhouse' | 'lever' | 'ashby' | 'email';
+  readonly id:
+    | 'adzuna'
+    | 'greenhouse'
+    | 'lever'
+    | 'ashby'
+    | 'email'
+    | 'france_travail';
   readonly displayName: string;
   readonly requestsPerSecond: number;
   isConfigured(ctx: SourceContext): boolean;

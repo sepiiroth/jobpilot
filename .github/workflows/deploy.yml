@@ -19,7 +19,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [api, worker, web]
+        include:
+          - app: api
+            dockerfile: apps/api/Dockerfile
+          - app: worker
+            dockerfile: apps/worker/Dockerfile
+          - app: web
+            dockerfile: apps/web/Dockerfile
+          - app: db
+            dockerfile: packages/db/Dockerfile
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -50,7 +58,7 @@ jobs:
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83
         with:
           context: .
-          file: apps/${{ matrix.app }}/Dockerfile
+          file: ${{ matrix.dockerfile }}
           load: true
           push: false
           tags: ${{ steps.image.outputs.ref }}
@@ -59,12 +67,12 @@ jobs:
             APP_NAME=${{ vars.APP_NAME || 'JobPilot' }}
           cache-from: type=gha,scope=${{ matrix.app }}
           cache-to: type=gha,mode=max,scope=${{ matrix.app }}
-      - name: Reject critical image vulnerabilities
+      - name: Reject high and critical image vulnerabilities
         uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8
         with:
           image-ref: ${{ steps.image.outputs.ref }}
           format: table
-          severity: CRITICAL
+          severity: HIGH,CRITICAL
           exit-code: '1'
       - name: Push scanned image
         env:

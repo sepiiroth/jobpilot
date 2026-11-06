@@ -48,6 +48,7 @@ export function SettingsPage() {
       ) : (
         <SettingsEditor value={settings.data} />
       )}
+      <OperationsStatus />
       <LlmUsage />
       <SecretEditor />
       <CompaniesEditor />
@@ -127,6 +128,45 @@ function SettingsEditor({ value }: { value: ProfileSettings }) {
             <Field form={form} name="ollamaBaseUrl" label={t('ollamaUrl')} />
           </div>
           <p className="profile-help">{t('modelsHelp')}</p>
+        </fieldset>
+        <fieldset>
+          <legend>{t('scheduleTitle')}</legend>
+          <p className="profile-help">{t('scheduleHelp')}</p>
+          <Controller
+            control={form.control}
+            name="collectionCron"
+            render={({ field }) => (
+              <div className="profile-field">
+                <label htmlFor="collectionCron">{t('collectionCron')}</label>
+                <Input
+                  id="collectionCron"
+                  value={field.value ?? ''}
+                  placeholder="0 7 * * 1-5"
+                  maxLength={100}
+                  onChange={(e) => field.onChange(e.target.value || null)}
+                />
+              </div>
+            )}
+          />
+          <Controller
+            control={form.control}
+            name="collectionCooldownMin"
+            render={({ field }) => (
+              <div className="profile-field">
+                <label htmlFor="collectionCooldownMin">
+                  {t('collectionCooldown')}
+                </label>
+                <Input
+                  id="collectionCooldownMin"
+                  type="number"
+                  min={0}
+                  max={10080}
+                  value={field.value}
+                  onChange={(e) => field.onChange(Number(e.target.value))}
+                />
+              </div>
+            )}
+          />
         </fieldset>
         <fieldset>
           <legend>{t('imapTitle')}</legend>
@@ -430,5 +470,36 @@ function CompanyForm({
         )}
       </div>
     </form>
+  );
+}
+
+function OperationsStatus() {
+  const t = useTranslations('Profile');
+  const query = useQuery({
+    queryKey: ['operations'],
+    queryFn: apiClient.operations,
+    refetchInterval: 60000,
+  });
+  return (
+    <div className="profile-editor">
+      <h2>{t('backupTitle')}</h2>
+      {query.isError || (!query.isPending && !query.data) ? (
+        <p role="status">{t('operationsUnavailable')}</p>
+      ) : query.data ? (
+        <>
+          <p role="status">{t('backup_' + query.data.backupStatus)}</p>
+          {query.data.lastBackupAt && (
+            <p>
+              {t('lastBackup')}{' '}
+              <time dateTime={query.data.lastBackupAt}>
+                {new Date(query.data.lastBackupAt).toLocaleString('fr-FR')}
+              </time>
+            </p>
+          )}
+        </>
+      ) : (
+        <p>{t('loading')}</p>
+      )}
+    </div>
   );
 }

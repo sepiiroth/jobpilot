@@ -24,7 +24,8 @@
     "./matching": "./src/matching.ts",
     "./email": "./src/email.ts",
     "./generation": "./src/generation.ts",
-    "./applications": "./src/applications.ts"
+    "./applications": "./src/applications.ts",
+    "./operations": "./src/operations.ts"
   },
   "dependencies": {
     "zod": "4.6.7"

@@ -1,3 +1,6 @@
+import type { Response } from 'express';
+import { operationsStatusSchema } from '@jobpilot/shared/operations';
+import { Redis } from 'ioredis';
 import { Controller, Get, Post, Delete, Inject } from '@nestjs/common';
 import { z } from 'zod';
 import { secretKindSchema } from '@jobpilot/shared/profile';
@@ -5,7 +8,16 @@ import type { AuthenticatedRequest } from '../auth/security.guard.ts';
 import { route } from '../common/http.ts';
 import { SettingsService } from './settings.service.ts';
 export class SettingsController {
-  constructor(private readonly service: SettingsService) {}
+  constructor(
+    private readonly service: SettingsService,
+    private readonly redis: Redis,
+    private readonly prefix: string,
+  ) {}
+  async operations(_req: AuthenticatedRequest, res: Response) {
+    void _req;
+    const value = await this.redis.get(this.prefix + ':operations-status');
+    res.json(value ? operationsStatusSchema.parse(JSON.parse(value)) : null);
+  }
   get(req: AuthenticatedRequest) {
     return this.service.get(req.principal.userId);
   }
@@ -65,9 +77,12 @@ export class SettingsController {
   }
 }
 Inject(SettingsService)(SettingsController, undefined, 0);
+Inject('VALKEY')(SettingsController, undefined, 1);
+Inject('QUEUE_PREFIX')(SettingsController, undefined, 2);
 Controller('settings')(SettingsController);
 for (const [name, method] of Object.entries({
   get: Get(),
+  operations: Get('operations'),
   save: Post(),
   secrets: Get('secrets'),
   secret: Get('secrets/:kind'),

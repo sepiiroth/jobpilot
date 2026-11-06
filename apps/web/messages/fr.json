@@ -223,7 +223,18 @@
     "atsType": "Plateforme ATS",
     "atsToken": "Identifiant public de l’entreprise",
     "atsHelp": "Utilisez l’identifiant du tableau d’offres public Greenhouse, Lever ou Ashby, sans URL ni clé privée.",
-    "viewPdf": "Ouvrir le PDF"
+    "viewPdf": "Ouvrir le PDF",
+    "scheduleTitle": "Collecte planifiée",
+    "scheduleHelp": "Laissez le champ vide pour désactiver. Format cron à cinq champs, en UTC : minute, heure, jour du mois, mois, jour de la semaine (0 = dimanche). Exemple : 0 7 * * 1-5 à 7 h UTC du lundi au vendredi. Prise en compte sous une minute, sans rattrapage des créneaux manqués. Le délai minimal entre collectes reste appliqué.",
+    "collectionCron": "Horaire de collecte (UTC)",
+    "collectionCooldown": "Délai minimal entre collectes (minutes)",
+    "backupTitle": "Sauvegardes chiffrées",
+    "backup_disabled": "Les sauvegardes sont désactivées. Configurez le stockage S3 et la clé publique age sur le serveur pour protéger vos données.",
+    "backup_pending": "Les sauvegardes sont activées. Première exécution prévue à 3 h UTC.",
+    "backup_succeeded": "La dernière sauvegarde chiffrée a été déposée sur le stockage S3.",
+    "backup_failed": "La dernière sauvegarde a échoué. Vérifiez la configuration du serveur et le stockage S3.",
+    "lastBackup": "Dernière sauvegarde réussie :",
+    "operationsUnavailable": "État des sauvegardes indisponible : vérifiez que le worker fonctionne."
   },
   "AI": {
     "importTitle": "Importer un CV existant",

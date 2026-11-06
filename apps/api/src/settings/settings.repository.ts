@@ -19,12 +19,28 @@ export class SettingsRepository {
           : (input.imap as Prisma.InputJsonValue),
     };
     return this.db.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${'collection:' + userId},0))`;
+      const previous = await tx.userSettings.findUnique({ where: { userId } });
       const result = await tx.userSettings.upsert({
         where: { userId },
         create: { ...data, userId },
         update: data,
       });
-      await tx.searchMatch.deleteMany({ where: { userId } });
+      if (
+        !previous ||
+        [
+          'llmProvider',
+          'scoringModel',
+          'embeddingProvider',
+          'embeddingModel',
+          'ollamaBaseUrl',
+        ].some(
+          (key) =>
+            previous[key as keyof typeof previous] !==
+            result[key as keyof typeof result],
+        )
+      )
+        await tx.searchMatch.deleteMany({ where: { userId } });
       return result;
     });
   }

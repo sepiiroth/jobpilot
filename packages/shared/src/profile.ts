@@ -1,3 +1,4 @@
+import { collectionCronSchema } from './operations.ts';
 import { z } from 'zod';
 import { embeddingStateSchema } from './llm.ts';
 import { resumeSchema, searchSchema, settingsSchema } from './index.ts';
@@ -65,7 +66,10 @@ export const imapSettingsSchema = z.strictObject({
   allowedSenders: z.array(z.email()).max(100),
 });
 export const profileSettingsSchema = settingsSchema
-  .omit({ collectionCron: true, collectionCooldownMin: true })
+  .extend({
+    collectionCron: collectionCronSchema.nullable().default(null),
+    collectionCooldownMin: z.number().int().min(0).max(10080).default(30),
+  })
   .extend({
     embeddingProvider: z.enum(['openai', 'voyage', 'mistral', 'ollama']),
     ollamaBaseUrl: z

@@ -1,13 +1,15 @@
 # JobPilot
 
-Self-hosted job search assistant. Includes secure accounts, resumes, searches, AI-assisted PDF import and manual collection from authorized job APIs and personal email alerts.
+Self-hosted job search assistant for authorized job collection, profile-based ranking, reviewed resume/letter drafts and application tracking. Includes optional UTC schedules, encrypted backups and tested recovery.
 
 ## Setup
+
+Existing instances must follow the [database image migration procedure](docs/deployment-caprover.md) before restarting Compose with the new image variant. Take an encrypted backup and verify an empty-target restore first; operating-system/locale changes can require rebuilding collation-dependent indexes.
 
 Use Node.js 24.22.1, pnpm 10.34.9, Docker Compose and gitleaks on your PATH.
 
 ```powershell
-pnpm install
+pnpm install --frozen-lockfile
 pnpm exec husky
 Copy-Item .env.example .env
 # Set POSTGRES_PASSWORD and VALKEY_PASSWORD in .env to unique local passwords.
@@ -20,7 +22,7 @@ docker compose ps
 
 Hook activation is explicit to respect the project prohibition on assistant Git operations. The pre-commit hook fails closed when gitleaks is missing and scans staged changes before lint-staged. The commit-msg hook enforces Conventional Commits. Only the developer stages and commits files.
 
-Apps: web, api, worker. Packages: shared, db, llm, sources, config. Frameworks and business logic are added in subsequent phases.
+Apps: web, api, worker. Packages: shared, db, llm, sources, config. The API verifies every session and ownership boundary; the worker handles collection, scoring, scheduling, retention and encrypted backups.
 
 Mailpit UI: http://localhost:8025; SMTP: localhost:1025. IMAP integration tests use a separate disposable Dovecot server alongside Mailpit; see the phase 9 guide.
 
@@ -81,3 +83,9 @@ From an offer, generate and edit private resume and cover-letter drafts with ton
 ## Application tracking
 
 Track offers from the offer detail page, then manage notes, calendar dates and the exact resume/letter versions used in the **Candidatures** board. Cards support pointer dragging, keyboard dragging and a native status selector. Follow-up dates display an overdue badge without sending notifications. See [the application tracking guide](docs/application-tracking.md) for behavior, privacy and verification.
+
+## Daily use and operations
+
+Start with [the user guide and fictional screenshots](docs/user-guide.md). Configure optional per-user UTC schedules in Settings. Administrators should follow [encrypted backups and tested restoration](docs/operations-and-recovery.md), then complete [the publication checklist](docs/publication-review.md). Backups stay disabled until S3 and an age public recipient are configured. France Travail remains disabled.
+
+The final automated checks include `pnpm test:e2e`, `pnpm verify:recovery` (after building the worker image), `pnpm audit --prod` and `pnpm osv:scan`. OSV receives only public npm package names and installed versions. No check sends resume or account data. All third-party dependencies retain their own licenses; the project's AGPL-3.0-only license applies to original project code.

@@ -1,3 +1,4 @@
+import { operationsStatusSchema } from '@jobpilot/shared/operations';
 import {
   applicationPageSchema,
   applicationRecordSchema,
@@ -125,6 +126,10 @@ export function createApiClient(fetcher: typeof fetch = fetch) {
     }
   }
   return {
+    operations: async () =>
+      operationsStatusSchema
+        .nullable()
+        .parse(await send('/settings/operations')),
     documents: async (matchId: string, cursor?: string) =>
       documentHistorySchema.parse(
         await send(

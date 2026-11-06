@@ -1,6 +1,9 @@
 services:
   postgres:
-    image: pgvector/pgvector:0.8.2-pg18
+    image: jobpilot-db:phase12
+    build:
+      context: .
+      dockerfile: packages/db/Dockerfile
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-jobpilot}
       POSTGRES_DB: ${POSTGRES_DB:-jobpilot}

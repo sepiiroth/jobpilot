@@ -38,9 +38,34 @@ const emptyStats = (): CollectionStats => ({
 });
 export class CollectionRepository {
   constructor(readonly db: PrismaClient) {}
-  async start(userId: string, cooldown: number) {
+  start(
+    userId: string,
+    cooldown: number,
+  ): Promise<Prisma.CollectionRunGetPayload<Record<string, never>>>;
+  start(
+    userId: string,
+    cooldown: number,
+    trigger: 'scheduled',
+    expectedCron: string,
+  ): Promise<Prisma.CollectionRunGetPayload<Record<string, never>> | null>;
+  async start(
+    userId: string,
+    cooldown: number,
+    trigger: 'manual' | 'scheduled' = 'manual',
+    expectedCron?: string,
+  ) {
     return this.db.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${'collection:' + userId},0))`;
+      if (trigger === 'scheduled') {
+        const settings = await tx.userSettings.findUnique({
+          where: { userId },
+        });
+        if (
+          !settings?.collectionCron ||
+          settings.collectionCron !== expectedCron
+        )
+          return null;
+      }
       const active = await tx.collectionRun.findFirst({
         where: { userId, status: { in: ['queued', 'running'] } },
       });
@@ -63,7 +88,7 @@ export class CollectionRepository {
       if (!searches.length)
         throw new CollectionConflict('COLLECTION_NO_SEARCHES');
       const run = await tx.collectionRun.create({
-        data: { userId, trigger: 'manual', stats: emptyStats() },
+        data: { userId, trigger, stats: emptyStats() },
       });
       const steps = searches.flatMap((search) => {
         const criteria = searchInputSchema.parse({
